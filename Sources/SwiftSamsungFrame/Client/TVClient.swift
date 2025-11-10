@@ -312,6 +312,25 @@ actor RemoteControl: RemoteControlProtocol {
 
 // MARK: - AppManagement Implementation
 
+/// Actor managing Samsung TV applications
+///
+/// Provides methods to list, launch, close, and manage applications on the TV.
+/// Uses both WebSocket and REST API endpoints for comprehensive app control.
+///
+/// Example usage:
+/// ```swift
+/// let client = TVClient()
+/// try await client.connect(to: "192.168.1.100")
+///
+/// // List installed apps
+/// let apps = try await client.apps.list()
+///
+/// // Launch an app
+/// try await client.apps.launch("111299001912") // YouTube
+///
+/// // Check app status
+/// let status = try await client.apps.status(of: "111299001912")
+/// ```
 actor AppManagement: AppManagementProtocol {
     private var webSocket: WebSocketClient?
     private var restClient: RESTClient?
@@ -324,6 +343,21 @@ actor AppManagement: AppManagementProtocol {
         self.restClient = client
     }
     
+    /// List all installed applications on the TV
+    ///
+    /// Sends a WebSocket request to retrieve the list of installed apps.
+    /// Note: Full response parsing requires WebSocket response handler implementation.
+    ///
+    /// - Returns: Array of installed TV apps (currently returns empty array pending response handler)
+    /// - Throws: `TVError.connectionFailed` if not connected to TV
+    ///
+    /// Example:
+    /// ```swift
+    /// let apps = try await client.apps.list()
+    /// for app in apps {
+    ///     print("\(app.name) - \(app.id)")
+    /// }
+    /// ```
     public func list() async throws -> [TVApp] {
         guard let webSocket else {
             throw TVError.connectionFailed(reason: "Not connected")
@@ -343,6 +377,20 @@ actor AppManagement: AppManagementProtocol {
         return []
     }
     
+    /// Launch a specific application on the TV
+    ///
+    /// Opens the specified app using its unique identifier. Common app IDs:
+    /// - Netflix: `111299001912`
+    /// - YouTube: `111299000912`
+    /// - Prime Video: `3201512006785`
+    ///
+    /// - Parameter appID: Unique application identifier
+    /// - Throws: `TVError.connectionFailed` if not connected to TV
+    ///
+    /// Example:
+    /// ```swift
+    /// try await client.apps.launch("111299001912") // Launch Netflix
+    /// ```
     public func launch(_ appID: String) async throws {
         guard let webSocket else {
             throw TVError.connectionFailed(reason: "Not connected")
@@ -357,6 +405,19 @@ actor AppManagement: AppManagementProtocol {
         try await webSocket.send(data)
     }
     
+    /// Close a running application on the TV
+    ///
+    /// Terminates the specified app using the REST API. The TV will typically
+    /// return to the home screen after the app is closed.
+    ///
+    /// - Parameter appID: Unique application identifier
+    /// - Throws: `TVError.connectionFailed` if REST client not available
+    /// - Throws: `TVError.commandFailed` if the TV rejects the request
+    ///
+    /// Example:
+    /// ```swift
+    /// try await client.apps.close("111299001912")
+    /// ```
     public func close(_ appID: String) async throws {
         guard let restClient else {
             throw TVError.connectionFailed(reason: "REST client not available")
@@ -369,6 +430,22 @@ actor AppManagement: AppManagementProtocol {
         try await restClient.closeApp(appID: appID)
     }
     
+    /// Get the current status of an application
+    ///
+    /// Queries the TV via REST API to determine if the app is running or stopped.
+    ///
+    /// - Parameter appID: Unique application identifier
+    /// - Returns: Current app status (`.running`, `.stopped`, or `.paused`)
+    /// - Throws: `TVError.connectionFailed` if REST client not available
+    /// - Throws: `TVError.invalidResponse` if response cannot be parsed
+    ///
+    /// Example:
+    /// ```swift
+    /// let status = try await client.apps.status(of: "111299001912")
+    /// if status == .running {
+    ///     print("App is currently running")
+    /// }
+    /// ```
     public func status(of appID: String) async throws -> AppStatus {
         guard let restClient else {
             throw TVError.connectionFailed(reason: "REST client not available")
@@ -389,6 +466,24 @@ actor AppManagement: AppManagementProtocol {
         return .stopped
     }
     
+    /// Install an application from the TV's app store
+    ///
+    /// Attempts to install the specified app using the REST API.
+    /// Note: This may not be supported on all TV models or for all apps.
+    ///
+    /// - Parameter appID: Application identifier from the TV's app store
+    /// - Throws: `TVError.connectionFailed` if REST client not available
+    /// - Throws: `TVError.commandFailed` if installation fails or is not supported
+    ///
+    /// Example:
+    /// ```swift
+    /// do {
+    ///     try await client.apps.install("appIdFromStore")
+    ///     print("App installation started")
+    /// } catch {
+    ///     print("Installation not supported or failed")
+    /// }
+    /// ```
     public func install(_ appID: String) async throws {
         guard let restClient else {
             throw TVError.connectionFailed(reason: "REST client not available")
@@ -404,6 +499,34 @@ actor AppManagement: AppManagementProtocol {
 
 // MARK: - ArtController Implementation
 
+/// Actor managing Art Mode features for Samsung Frame TVs
+///
+/// Provides comprehensive control over Art Mode, including:
+/// - Listing and selecting artwork
+/// - Uploading custom images
+/// - Managing photo filters and matte styles
+/// - Toggling Art Mode on/off
+///
+/// Note: Art Mode features are only available on Samsung Frame TV models.
+/// Always check `isSupported()` before using Art Mode features.
+///
+/// Example usage:
+/// ```swift
+/// let client = TVClient()
+/// try await client.connect(to: "192.168.1.100")
+///
+/// // Check if Art Mode is supported
+/// guard try await client.art.isSupported() else {
+///     print("This TV doesn't support Art Mode")
+///     return
+/// }
+///
+/// // Select an art piece
+/// try await client.art.select("contentId", show: true)
+///
+/// // Enable Art Mode
+/// try await client.art.setArtMode(enabled: true)
+/// ```
 actor ArtController: ArtControllerProtocol {
     private var webSocket: WebSocketClient?
     private var restClient: RESTClient?
@@ -440,6 +563,23 @@ actor ArtController: ArtControllerProtocol {
         try await webSocket.send(data)
     }
     
+    /// Check if Art Mode is supported on the connected TV
+    ///
+    /// Queries the TV's device information to determine if it's a Frame TV
+    /// with Art Mode capabilities.
+    ///
+    /// - Returns: `true` if Art Mode is supported, `false` otherwise
+    /// - Throws: `TVError.connectionFailed` if REST client not available
+    /// - Throws: `TVError.networkUnreachable` if unable to reach TV
+    ///
+    /// Example:
+    /// ```swift
+    /// if try await client.art.isSupported() {
+    ///     print("Art Mode is available")
+    /// } else {
+    ///     print("This TV doesn't support Art Mode")
+    /// }
+    /// ```
     public func isSupported() async throws -> Bool {
         guard let restClient else {
             throw TVError.connectionFailed(reason: "REST client not available")
@@ -457,6 +597,24 @@ actor ArtController: ArtControllerProtocol {
         return false
     }
     
+    /// List all available art pieces on the TV
+    ///
+    /// Retrieves the list of art available in the TV's art library,
+    /// including both built-in artwork and user-uploaded images.
+    ///
+    /// - Returns: Array of art pieces (currently returns empty array pending WebSocket response handler)
+    /// - Throws: `TVError.connectionFailed` if not connected
+    /// - Throws: `TVError.artModeNotSupported` if TV doesn't support Art Mode
+    ///
+    /// Note: Full implementation requires WebSocket response handling.
+    ///
+    /// Example:
+    /// ```swift
+    /// let artPieces = try await client.art.listAvailable()
+    /// for art in artPieces {
+    ///     print("\(art.title) - \(art.id)")
+    /// }
+    /// ```
     public func listAvailable() async throws -> [ArtPiece] {
         #if canImport(OSLog)
         Logger.commands.debug("Requesting art list")
@@ -472,6 +630,21 @@ actor ArtController: ArtControllerProtocol {
         return []
     }
     
+    /// Get the currently displayed art piece
+    ///
+    /// Retrieves information about the art currently shown on the TV.
+    ///
+    /// - Returns: Current art piece
+    /// - Throws: `TVError.artModeNotSupported` if TV doesn't support Art Mode
+    /// - Throws: `TVError.connectionFailed` if not connected
+    ///
+    /// Note: Full implementation requires WebSocket response handling.
+    ///
+    /// Example:
+    /// ```swift
+    /// let current = try await client.art.current()
+    /// print("Currently displaying: \(current.title)")
+    /// ```
     public func current() async throws -> ArtPiece {
         #if canImport(OSLog)
         Logger.commands.debug("Requesting current artwork")
@@ -485,6 +658,25 @@ actor ArtController: ArtControllerProtocol {
         throw TVError.artModeNotSupported
     }
     
+    /// Select an art piece to display
+    ///
+    /// Changes the displayed artwork to the specified piece.
+    ///
+    /// - Parameters:
+    ///   - artID: Unique identifier of the art piece
+    ///   - show: If `true`, immediately enters Art Mode and displays the art.
+    ///           If `false`, sets the art but doesn't activate Art Mode. Default is `true`.
+    /// - Throws: `TVError.connectionFailed` if not connected
+    /// - Throws: `TVError.deviceNotFound` if art ID doesn't exist
+    ///
+    /// Example:
+    /// ```swift
+    /// // Select and show art immediately
+    /// try await client.art.select("art_12345", show: true)
+    ///
+    /// // Select art without activating Art Mode
+    /// try await client.art.select("art_12345", show: false)
+    /// ```
     public func select(_ artID: String, show: Bool = true) async throws {
         #if canImport(OSLog)
         Logger.commands.info("Selecting art: \(artID), show: \(show)")
@@ -497,11 +689,57 @@ actor ArtController: ArtControllerProtocol {
         ])
     }
     
+    /// Upload a custom image to the TV's art library
+    ///
+    /// Uploads a custom JPEG or PNG image to the Frame TV. The image can optionally
+    /// include a matte style for framing.
+    ///
+    /// **Image Requirements:**
+    /// - Format: JPEG or PNG
+    /// - Maximum size: 20 MB (recommended)
+    /// - Minimum dimensions: 1920x1080 (Full HD)
+    /// - Recommended dimensions: 3840x2160 (4K) or TV's native resolution
+    ///
+    /// **Platform Notes:**
+    /// - watchOS: Upload functionality is disabled due to memory constraints
+    ///
+    /// - Parameters:
+    ///   - imageData: Image data in JPEG or PNG format
+    ///   - imageType: Image format (`.jpeg` or `.png`)
+    ///   - matte: Optional matte style for framing the image
+    /// - Returns: Unique identifier for the uploaded art piece
+    /// - Throws: `TVError.invalidImageFormat` if image format is invalid or too large
+    /// - Throws: `TVError.uploadFailed` if upload fails
+    /// - Throws: `TVError.commandFailed` if D2D socket implementation is not complete
+    ///
+    /// Note: Full upload requires D2D socket implementation.
+    ///
+    /// Example:
+    /// ```swift
+    /// let imageData = try Data(contentsOf: imageURL)
+    /// let artID = try await client.art.upload(
+    ///     imageData,
+    ///     type: .jpeg,
+    ///     matte: .modern
+    /// )
+    /// print("Uploaded art ID: \(artID)")
+    /// ```
     public func upload(
         _ imageData: Data,
         type imageType: ImageType,
         matte: MatteStyle? = nil
     ) async throws -> String {
+        // Platform check: Disable upload on watchOS due to memory constraints
+        #if os(watchOS)
+        throw TVError.commandFailed(
+            code: 501,
+            message: "Upload not supported on watchOS due to memory constraints"
+        )
+        #else
+        
+        // Image validation
+        try validateImageData(imageData, type: imageType)
+        
         #if canImport(OSLog)
         Logger.commands.info("Uploading image via WebSocket D2D transfer")
         #endif
@@ -539,12 +777,83 @@ actor ArtController: ArtControllerProtocol {
             code: 501,
             message: "Upload requires full D2D socket implementation"
         )
+        #endif
     }
     
+    /// Validate image data before upload
+    /// - Parameters:
+    ///   - imageData: Image data to validate
+    ///   - imageType: Expected image format
+    /// - Throws: `TVError.uploadFailed` if validation fails
+    private func validateImageData(_ imageData: Data, type imageType: ImageType) throws {
+        // Check if data is empty
+        guard !imageData.isEmpty else {
+            throw TVError.uploadFailed(reason: "Image data is empty")
+        }
+        
+        // Check maximum size (20 MB recommended limit)
+        let maxSize = 20 * 1024 * 1024 // 20 MB
+        guard imageData.count <= maxSize else {
+            throw TVError.uploadFailed(
+                reason: "Image size (\(imageData.count) bytes) exceeds maximum limit of 20 MB"
+            )
+        }
+        
+        // Validate image format by checking magic bytes
+        guard imageData.count >= 4 else {
+            throw TVError.uploadFailed(reason: "Image data too small to determine format")
+        }
+        
+        let bytes = [UInt8](imageData.prefix(4))
+        
+        switch imageType {
+        case .jpeg:
+            // JPEG magic bytes: FF D8 FF
+            guard bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF else {
+                throw TVError.invalidImageFormat(expected: .jpeg)
+            }
+        case .png:
+            // PNG magic bytes: 89 50 4E 47
+            guard bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47 else {
+                throw TVError.invalidImageFormat(expected: .png)
+            }
+        }
+        
+        #if canImport(OSLog)
+        Logger.commands.debug("Image validation passed: \(imageType.rawValue), size: \(imageData.count) bytes")
+        #endif
+    }
+    
+    /// Delete a single art piece from the TV's library
+    ///
+    /// Removes a custom uploaded image from the art library. Built-in art
+    /// pieces cannot be deleted.
+    ///
+    /// - Parameter artID: Unique identifier of the art piece to delete
+    /// - Throws: `TVError.connectionFailed` if not connected
+    /// - Throws: `TVError.commandFailed` if deletion fails
+    ///
+    /// Example:
+    /// ```swift
+    /// try await client.art.delete("art_12345")
+    /// ```
     public func delete(_ artID: String) async throws {
         try await deleteMultiple([artID])
     }
     
+    /// Delete multiple art pieces from the TV's library
+    ///
+    /// Removes multiple custom uploaded images in a single operation.
+    /// This is more efficient than calling `delete()` multiple times.
+    ///
+    /// - Parameter artIDs: Array of art piece identifiers to delete
+    /// - Throws: `TVError.connectionFailed` if not connected
+    /// - Throws: `TVError.commandFailed` if deletion fails
+    ///
+    /// Example:
+    /// ```swift
+    /// try await client.art.deleteMultiple(["art_001", "art_002", "art_003"])
+    /// ```
     public func deleteMultiple(_ artIDs: [String]) async throws {
         #if canImport(OSLog)
         Logger.commands.info("Deleting \(artIDs.count) art pieces")
@@ -558,6 +867,24 @@ actor ArtController: ArtControllerProtocol {
         ])
     }
     
+    /// Get a thumbnail preview of an art piece
+    ///
+    /// Downloads a JPEG thumbnail of the specified art piece.
+    /// Thumbnails are typically 480x270 pixels.
+    ///
+    /// - Parameter artID: Unique identifier of the art piece
+    /// - Returns: Thumbnail image data in JPEG format
+    /// - Throws: `TVError.connectionFailed` if not connected
+    /// - Throws: `TVError.invalidResponse` if thumbnail cannot be retrieved
+    /// - Throws: `TVError.commandFailed` if D2D socket implementation is not complete
+    ///
+    /// Note: Full implementation requires D2D socket support.
+    ///
+    /// Example:
+    /// ```swift
+    /// let thumbnailData = try await client.art.thumbnail(for: "art_12345")
+    /// // Use thumbnailData to display preview
+    /// ```
     public func thumbnail(for artID: String) async throws -> Data {
         #if canImport(OSLog)
         Logger.commands.debug("Requesting thumbnail for: \(artID)")
@@ -588,6 +915,25 @@ actor ArtController: ArtControllerProtocol {
         )
     }
     
+    /// Check if Art Mode is currently active
+    ///
+    /// Determines whether the TV is currently in Art Mode (displaying artwork)
+    /// or in normal TV mode.
+    ///
+    /// - Returns: `true` if Art Mode is active, `false` otherwise
+    /// - Throws: `TVError.artModeNotSupported` if TV doesn't support Art Mode
+    /// - Throws: `TVError.connectionFailed` if not connected
+    ///
+    /// Note: Full implementation requires WebSocket response handling.
+    ///
+    /// Example:
+    /// ```swift
+    /// if try await client.art.isArtModeActive() {
+    ///     print("TV is in Art Mode")
+    /// } else {
+    ///     print("TV is in normal mode")
+    /// }
+    /// ```
     public func isArtModeActive() async throws -> Bool {
         #if canImport(OSLog)
         Logger.commands.debug("Checking art mode status")
@@ -601,6 +947,23 @@ actor ArtController: ArtControllerProtocol {
         return false
     }
     
+    /// Toggle Art Mode on or off
+    ///
+    /// Switches the TV between Art Mode (displaying artwork) and normal TV mode.
+    /// When enabled, the TV displays the currently selected art piece.
+    ///
+    /// - Parameter enabled: `true` to enable Art Mode, `false` to disable
+    /// - Throws: `TVError.connectionFailed` if not connected
+    /// - Throws: `TVError.commandFailed` if mode switch fails
+    ///
+    /// Example:
+    /// ```swift
+    /// // Enable Art Mode
+    /// try await client.art.setArtMode(enabled: true)
+    ///
+    /// // Disable Art Mode
+    /// try await client.art.setArtMode(enabled: false)
+    /// ```
     public func setArtMode(enabled: Bool) async throws {
         #if canImport(OSLog)
         Logger.commands.info("Setting art mode: \(enabled)")
@@ -612,6 +975,24 @@ actor ArtController: ArtControllerProtocol {
         ])
     }
     
+    /// List all available photo filters
+    ///
+    /// Retrieves the list of photo filters that can be applied to artwork.
+    /// Common filters include watercolor, oil painting, pencil sketch, etc.
+    ///
+    /// - Returns: Array of available photo filters (currently returns empty array pending WebSocket response handler)
+    /// - Throws: `TVError.artModeNotSupported` if TV doesn't support Art Mode
+    /// - Throws: `TVError.connectionFailed` if not connected
+    ///
+    /// Note: Full implementation requires WebSocket response handling.
+    ///
+    /// Example:
+    /// ```swift
+    /// let filters = try await client.art.availableFilters()
+    /// for filter in filters {
+    ///     print("Filter: \(filter.rawValue)")
+    /// }
+    /// ```
     public func availableFilters() async throws -> [PhotoFilter] {
         #if canImport(OSLog)
         Logger.commands.debug("Requesting photo filter list")
@@ -625,6 +1006,28 @@ actor ArtController: ArtControllerProtocol {
         return []
     }
     
+    /// Apply a photo filter to an art piece
+    ///
+    /// Applies a visual filter effect to the specified artwork.
+    /// The filter modifies how the image is displayed on the TV.
+    ///
+    /// Available filters (if supported by TV):
+    /// - `.watercolor` - Watercolor painting effect
+    /// - `.pencilSketch` - Pencil sketch effect
+    /// - `.oilPainting` - Oil painting effect
+    /// - `.vintage` - Vintage/aged photo effect
+    /// - `.none` - Remove all filters
+    ///
+    /// - Parameters:
+    ///   - filter: Photo filter to apply
+    ///   - artID: Unique identifier of the art piece
+    /// - Throws: `TVError.connectionFailed` if not connected
+    /// - Throws: `TVError.commandFailed` if filter application fails
+    ///
+    /// Example:
+    /// ```swift
+    /// try await client.art.applyFilter(.watercolor, to: "art_12345")
+    /// ```
     public func applyFilter(_ filter: PhotoFilter, to artID: String) async throws {
         #if canImport(OSLog)
         Logger.commands.info("Applying filter \(filter.rawValue) to art: \(artID)")

@@ -120,7 +120,17 @@ public struct AppListMessage: Sendable, Codable {
         ]
         
         let jsonData = try JSONSerialization.data(withJSONObject: dataDict)
-        let jsonString = String(data: jsonData, encoding: .utf8)!
+        guard let jsonString = String(data: jsonData, encoding: .utf8) else {
+            // This should never happen, but handle gracefully
+            return AppListMessage(
+                method: "ms.channel.emit",
+                params: Params(
+                    event: "ed.apps.launch",
+                    to: "host",
+                    data: ""
+                )
+            )
+        }
         
         return AppListMessage(
             method: "ms.channel.emit",

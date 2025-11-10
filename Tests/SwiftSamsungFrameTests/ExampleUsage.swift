@@ -16,8 +16,8 @@ func exampleBasicUsage() async {
     let device = TVDevice(
         id: "living-room-tv",
         ipAddress: "192.168.1.100", // Replace with your TV's IP
-        name: "Living Room Samsung TV",
-        modelName: "QN55Q80A"
+        modelName: "QN55Q80A",
+        name: "Living Room Samsung TV"
     )
     
     // Step 2: Create a TV client
@@ -196,7 +196,7 @@ func exampleConnectionState() async {
         
         // Send commands only if authenticated
         if connectedState == .authenticated {
-            try await client.remote.volumeUp()
+            try await client.remote.volumeUp(steps: 1)
         }
         
     } catch {

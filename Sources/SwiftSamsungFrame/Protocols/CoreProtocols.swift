@@ -58,12 +58,12 @@ public protocol RemoteControlProtocol: Sendable {
     func power() async throws
     
     /// Increase volume
-    /// - Parameter steps: Number of volume increments (default: 1)
+    /// - Parameter steps: Number of volume increments
     /// - Throws: TVError.commandFailed
     func volumeUp(steps: Int) async throws
     
     /// Decrease volume
-    /// - Parameter steps: Number of volume decrements (default: 1)
+    /// - Parameter steps: Number of volume decrements
     /// - Throws: TVError.commandFailed
     func volumeDown(steps: Int) async throws
     

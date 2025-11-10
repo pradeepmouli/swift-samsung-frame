@@ -9,7 +9,7 @@ import Foundation
 public actor D2DSocketClient {
     /// Helper to generate random connection ID
     public static func generateConnectionID() -> Int {
-        Int.random(in: 0..<(4 * 1024 * 1024 * 1024))
+        Int.random(in: 0..<min(4 * 1024 * 1024 * 1024, Int.max))
     }
     
     /// Transfer data using TCP connection

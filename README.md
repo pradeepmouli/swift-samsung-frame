@@ -174,6 +174,56 @@ The library is organized into modular components:
 
 All components follow Swift 6 strict concurrency requirements using actors and Sendable types.
 
+## Platform Support
+
+### Supported Platforms
+
+- **iOS 18+** ✅ Full support (MVP platform)
+- **iPadOS 18+** ✅ Full support (MVP platform)
+- **macOS 15+** ✅ Full support
+- **tvOS 18+** ✅ Full support
+- **watchOS 11+** ⚠️ Limited support (see below)
+
+### Platform-Specific Features
+
+#### Network Discovery (mDNS/SSDP)
+- **Available on**: iOS, iPadOS, macOS, tvOS
+- Uses Apple's Network framework for service discovery
+- Supports both mDNS (Bonjour) and SSDP protocols
+- **Not available on**: Linux and other non-Apple platforms
+
+#### Keychain Token Storage
+- **Available on**: iOS, iPadOS, macOS, tvOS, watchOS
+- Secure storage using system Keychain
+- Supports Keychain access groups for sharing between apps
+- **Not available on**: Linux and other non-Apple platforms
+
+#### D2D Socket Client (Art Uploads)
+- **Available on**: iOS, iPadOS, macOS, tvOS
+- Uses Network framework for direct TCP socket connections
+- Enables art image upload/download for Frame TVs
+- **Not available on**: watchOS (memory constraints), Linux
+
+### watchOS Limitations
+
+Due to memory constraints and limited networking capabilities on watchOS:
+
+- ✅ Basic remote control commands
+- ✅ Connection management
+- ✅ Token storage via Keychain
+- ❌ Art image upload (disabled)
+- ❌ Large data transfers
+- ⚠️ Limited discovery capabilities
+
+### Linux Support
+
+For Linux platform (experimental):
+- ✅ Basic data models and protocols
+- ✅ Core TVClient functionality (with FoundationNetworking)
+- ❌ Keychain storage (use custom TokenStorageProtocol implementation)
+- ❌ Network discovery
+- ❌ D2D socket transfers
+
 ## Development Status
 
 **Current Version**: 0.2.0-alpha
@@ -184,15 +234,16 @@ All components follow Swift 6 strict concurrency requirements using actors and S
 - ✅ REST API client
 - ✅ TVClient with connection management
 - ✅ Remote control commands (full implementation)
-- ✅ Keychain token storage
+- ✅ Keychain token storage (Apple platforms)
 - ✅ Application management (WebSocket + REST)
 - ✅ Art Mode WebSocket protocol implementation
 - ✅ Device discovery (manual lookup)
+- ✅ D2D socket implementation (Apple platforms with Network framework)
+- ✅ mDNS/SSDP network discovery (Apple platforms)
 
 ### In Progress
-- 🚧 D2D socket implementation for art upload/download
-- 🚧 mDNS/SSDP network discovery
 - 🚧 WebSocket response parsing for art and app lists
+- 🚧 Complete art upload flow integration
 
 ### Planned
 - 📋 Advanced connection features (health checks, auto-reconnect)

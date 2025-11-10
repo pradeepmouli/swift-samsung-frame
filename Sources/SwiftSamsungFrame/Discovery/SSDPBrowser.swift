@@ -105,14 +105,12 @@ actor SSDPBrowser {
         guard let connection else { return }
         
         // M-SEARCH message targeting Samsung RemoteControlReceiver
-        let mSearchMessage = """
-        M-SEARCH * HTTP/1.1\r
-        HOST: 239.255.255.250:1900\r
-        MAN: "ssdp:discover"\r
-        MX: 3\r
-        ST: urn:samsung.com:device:RemoteControlReceiver:1\r
-        \r
-        """
+        let mSearchMessage = "M-SEARCH * HTTP/1.1\r\n" +
+            "HOST: 239.255.255.250:1900\r\n" +
+            "MAN: \"ssdp:discover\"\r\n" +
+            "MX: 3\r\n" +
+            "ST: urn:samsung.com:device:RemoteControlReceiver:1\r\n" +
+            "\r\n"
         
         guard let data = mSearchMessage.data(using: .utf8) else { return }
         

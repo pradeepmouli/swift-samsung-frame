@@ -115,7 +115,7 @@ public final class KeychainTokenStorage: TokenStorageProtocol, @unchecked Sendab
     public init(serviceName: String = "com.swiftsamsungframe.tokens", accessGroup: String? = nil) {}
     
     public func save(_ token: AuthenticationToken, for deviceID: String) async throws {
-        throw TVError.connectionFailed(reason: "Keychain not available on this platform")
+        throw TVError.authenticationFailed(reason: "Keychain not available on this platform")
     }
     
     public func retrieve(for deviceID: String) async throws -> AuthenticationToken? {

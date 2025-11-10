@@ -11,7 +11,7 @@ public enum NavigationDirection: Sendable {
     case right
     
     /// Convert navigation direction to key code
-    var keyCode: KeyCode {
+    public var keyCode: KeyCode {
         switch self {
         case .up: return .up
         case .down: return .down

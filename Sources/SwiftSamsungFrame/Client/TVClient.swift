@@ -708,8 +708,8 @@ actor ArtController: ArtControllerProtocol {
     ///   - imageType: Image format (`.jpeg` or `.png`)
     ///   - matte: Optional matte style for framing the image
     /// - Returns: Unique identifier for the uploaded art piece
-    /// - Throws: `TVError.invalidImageFormat` if image format is invalid or too large
-    /// - Throws: `TVError.uploadFailed` if upload fails
+    /// - Throws: `TVError.invalidImageFormat` if image format is invalid
+    /// - Throws: `TVError.uploadFailed` if image data is too large or upload fails
     /// - Throws: `TVError.commandFailed` if D2D socket implementation is not complete
     ///
     /// Note: Full upload requires D2D socket implementation.

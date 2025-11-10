@@ -107,3 +107,24 @@ func testConnectionStateEncoding() async throws {
         #expect(decoded == state)
     }
 }
+
+@Test("D2DSocketClient can generate connection IDs")
+func testD2DSocketClientConnectionID() async throws {
+    let id1 = D2DSocketClient.generateConnectionID()
+    let id2 = D2DSocketClient.generateConnectionID()
+    
+    // Verify IDs are generated
+    #expect(id1 > 0)
+    #expect(id2 > 0)
+    
+    // Verify IDs are (likely) different
+    #expect(id1 != id2)
+}
+
+@Test("D2DSocketClient can be instantiated")
+func testD2DSocketClientInstantiation() async throws {
+    let client = D2DSocketClient()
+    
+    // Verify client can be used (compilation check for cancel method)
+    await client.cancel()
+}

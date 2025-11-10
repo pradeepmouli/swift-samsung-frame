@@ -15,7 +15,7 @@ public enum TVError: Error, Sendable {
     case authenticationFailed
     
     /// Operation timed out
-    case timeout(operation: String)
+    case timeout(operation: String, error: String? = nil)
     
     /// Network is unreachable
     case networkUnreachable
@@ -54,8 +54,12 @@ extension TVError: LocalizedError {
             return "Authentication required. Please approve the connection on your TV."
         case .authenticationFailed:
             return "Authentication failed. The connection was rejected."
-        case .timeout(let operation):
-            return "Operation timed out: \(operation)"
+        case .timeout(let operation, let error):
+            if let error {
+                return "Operation timed out: \(operation) - \(error)"
+            } else {
+                return "Operation timed out: \(operation)"
+            }
         case .networkUnreachable:
             return "Network is unreachable. Please check your connection."
         case .invalidResponse(let details):

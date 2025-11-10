@@ -110,58 +110,59 @@ public struct AppListMessage: Sendable, Codable {
             )
         )
     }
+    
+    /// Create message to launch app
+    static func launchApp(appID: String, appType: String = "DEEP_LINK", metaTag: String = "") -> AppListMessage {
+        let dataDict: [String: Any] = [
+            "appId": appID,
+            "action_type": appType,
+            "metaTag": metaTag
+        ]
+        
+        let jsonData = try! JSONSerialization.data(withJSONObject: dataDict)
+        let jsonString = String(data: jsonData, encoding: .utf8)!
+        
+        return AppListMessage(
+            method: "ms.channel.emit",
+            params: Params(
+                event: "ed.apps.launch",
+                to: "host",
+                data: jsonString
+            )
+        )
+    }
 }
 
-/// Art mode message
-public struct ArtMessage: Sendable, Codable {
+/// Art mode channel emit message
+public struct ArtChannelMessage: Sendable, Codable {
     let method: String
     let params: Params
     
     struct Params: Sendable, Codable {
         let event: String
         let to: String
-        let data: DataParams?
+        let data: String
         
-        struct DataParams: Sendable, Codable {
-            let content_id: String?
-            let category: String?
-            
-            init(content_id: String? = nil, category: String? = nil) {
-                self.content_id = content_id
-                self.category = category
-            }
-        }
-        
-        init(event: String, to: String, data: DataParams? = nil) {
+        init(event: String, to: String, data: String) {
             self.event = event
             self.to = to
             self.data = data
         }
     }
     
-    /// Create message to get art list
-    static func getArtList() -> ArtMessage {
-        ArtMessage(
+    /// Create art app request message
+    /// - Parameter requestData: Dictionary containing request parameters
+    /// - Returns: Encoded art channel message
+    static func artAppRequest(_ requestData: [String: Any]) throws -> ArtChannelMessage {
+        let jsonData = try JSONSerialization.data(withJSONObject: requestData)
+        let jsonString = String(data: jsonData, encoding: .utf8)!
+        
+        return ArtChannelMessage(
             method: "ms.channel.emit",
             params: Params(
-                event: "art_list",
+                event: "art_app_request",
                 to: "host",
-                data: nil
-            )
-        )
-    }
-    
-    /// Create message to select art
-    static func selectArt(contentID: String) -> ArtMessage {
-        ArtMessage(
-            method: "ms.channel.emit",
-            params: Params(
-                event: "art_select",
-                to: "host",
-                data: Params.DataParams(
-                    content_id: contentID,
-                    category: nil
-                )
+                data: jsonString
             )
         )
     }

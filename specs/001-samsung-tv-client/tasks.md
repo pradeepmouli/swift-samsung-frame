@@ -135,7 +135,7 @@ From spec.md:
 - [x] T051 [US5] Implement discover() method returning AsyncStream<DiscoveryResult> in DiscoveryService
 - [x] T052 [US5] Implement mDNS service discovery for "_samsung-remote._tcp.local." service type in MDNSBrowser
 - [x] T053 [US5] Implement SSDP M-SEARCH multicast to 239.255.255.250:1900 in SSDPBrowser
-- [x] T054 [US5] Parse mDNS TXT records to filter for Frame TV models in MDNSBrowser (Note: TXT records available but basic filtering implemented)
+- [ ] T054 [US5] Parse mDNS TXT records to filter for Frame TV models in MDNSBrowser (Note: TXT records available but basic filtering implemented)
 - [x] T055 [US5] Parse SSDP responses for Samsung TV URN "urn:samsung.com:device:RemoteControlReceiver" in SSDPBrowser
 - [x] T056 [US5] Implement discovery strategy: try mDNS first (3s), fallback to SSDP (7s total) in DiscoveryService
 - [x] T057 [US5] Implement find(at:) method for quick validation of known IP address in DiscoveryService

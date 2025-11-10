@@ -170,6 +170,8 @@ public actor TVClient: TVClientProtocol {
 
 actor RemoteControl: RemoteControlProtocol {
     private var webSocket: WebSocketClient?
+    private let commandTimeout: Duration = .seconds(5)
+    private let retryDelay: Duration = .milliseconds(500)
     
     func setWebSocket(_ ws: WebSocketClient) {
         self.webSocket = ws
@@ -186,21 +188,66 @@ actor RemoteControl: RemoteControlProtocol {
         
         let message = WebSocketMessage.remoteControl(key: key.rawValue)
         let data = try JSONEncoder().encode(message)
-        try await webSocket.send(data)
+        
+        // Try with timeout and retry once on failure
+        do {
+            try await withTimeout(commandTimeout) {
+                try await webSocket.send(data)
+            }
+        } catch is TimeoutError {
+            #if canImport(OSLog)
+            Logger.commands.warning("Command timed out: \(key.rawValue), retrying...")
+            #endif
+            
+            // Retry once after delay
+            try await Task.sleep(for: retryDelay)
+            
+            do {
+                try await withTimeout(commandTimeout) {
+                    try await webSocket.send(data)
+                }
+            } catch is TimeoutError {
+                throw TVError.timeout(operation: "sendKey(\(key.rawValue))")
+            } catch {
+                throw TVError.commandFailed(code: -1, message: error.localizedDescription)
+            }
+        } catch {
+            throw TVError.commandFailed(code: -1, message: error.localizedDescription)
+        }
+        
+        #if canImport(OSLog)
+        Logger.commands.debug("Key sent successfully: \(key.rawValue)")
+        #endif
     }
     
     public func sendKeys(_ keys: [KeyCode], delay: Duration = .milliseconds(100)) async throws {
-        for key in keys {
+        #if canImport(OSLog)
+        Logger.commands.info("Sending \(keys.count) keys with delay")
+        #endif
+        
+        for (index, key) in keys.enumerated() {
             try await sendKey(key)
-            try await Task.sleep(for: delay)
+            
+            // Don't delay after the last key
+            if index < keys.count - 1 {
+                try await Task.sleep(for: delay)
+            }
         }
     }
     
     public func power() async throws {
+        #if canImport(OSLog)
+        Logger.commands.info("Toggling power")
+        #endif
+        
         try await sendKey(.power)
     }
     
     public func volumeUp(steps: Int = 1) async throws {
+        #if canImport(OSLog)
+        Logger.commands.info("Increasing volume by \(steps) steps")
+        #endif
+        
         for _ in 0..<steps {
             try await sendKey(.volumeUp)
             try await Task.sleep(for: .milliseconds(100))
@@ -208,6 +255,10 @@ actor RemoteControl: RemoteControlProtocol {
     }
     
     public func volumeDown(steps: Int = 1) async throws {
+        #if canImport(OSLog)
+        Logger.commands.info("Decreasing volume by \(steps) steps")
+        #endif
+        
         for _ in 0..<steps {
             try await sendKey(.volumeDown)
             try await Task.sleep(for: .milliseconds(100))
@@ -215,22 +266,42 @@ actor RemoteControl: RemoteControlProtocol {
     }
     
     public func mute() async throws {
+        #if canImport(OSLog)
+        Logger.commands.info("Toggling mute")
+        #endif
+        
         try await sendKey(.mute)
     }
     
     public func navigate(_ direction: NavigationDirection) async throws {
+        #if canImport(OSLog)
+        Logger.commands.debug("Navigating: \(direction)")
+        #endif
+        
         try await sendKey(direction.keyCode)
     }
     
     public func enter() async throws {
+        #if canImport(OSLog)
+        Logger.commands.debug("Pressing enter")
+        #endif
+        
         try await sendKey(.enter)
     }
     
     public func back() async throws {
+        #if canImport(OSLog)
+        Logger.commands.debug("Pressing back")
+        #endif
+        
         try await sendKey(.back)
     }
     
     public func home() async throws {
+        #if canImport(OSLog)
+        Logger.commands.info("Going to home screen")
+        #endif
+        
         try await sendKey(.home)
     }
 }
@@ -560,5 +631,39 @@ actor ArtController: ArtControllerProtocol {
             "content_id": artID,
             "filter_id": filter.rawValue
         ])
+    }
+}
+
+// MARK: - Timeout Helper
+
+/// Error thrown when operation times out
+private struct TimeoutError: Error {}
+
+/// Execute operation with timeout
+/// - Parameters:
+///   - timeout: Maximum duration to wait
+///   - operation: Async operation to execute
+/// - Throws: TimeoutError if operation exceeds timeout
+/// - Returns: Result of operation
+private func withTimeout<T: Sendable>(
+    _ timeout: Duration,
+    operation: @escaping @Sendable () async throws -> T
+) async throws -> T {
+    try await withThrowingTaskGroup(of: T.self) { group in
+        group.addTask {
+            try await operation()
+        }
+        
+        group.addTask {
+            try await Task.sleep(for: timeout)
+            throw TimeoutError()
+        }
+        
+        guard let result = try await group.next() else {
+            throw TimeoutError()
+        }
+        
+        group.cancelAll()
+        return result
     }
 }

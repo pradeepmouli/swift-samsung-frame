@@ -136,16 +136,70 @@ public actor WebSocketClient {
 
 /// URLSession delegate to handle TLS certificate validation
 private class WebSocketDelegate: NSObject, URLSessionWebSocketDelegate {
+    private let expectedHostname: String
+
+    init(expectedHostname: String) {
+        self.expectedHostname = expectedHostname
+    }
+
     func urlSession(
         _ session: URLSession,
         didReceive challenge: URLAuthenticationChallenge,
         completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
     ) {
-        // Trust self-signed certificates from Samsung TVs
+        // Validate server certificate and hostname
         if challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
            let serverTrust = challenge.protectionSpace.serverTrust {
-            let credential = URLCredential(trust: serverTrust)
-            completionHandler(.useCredential, credential)
+            #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+            var secresult = SecTrustResultType.invalid
+            #endif
+            var isServerTrusted = false
+            #if swift(>=5.3)
+            if #available(iOS 13.0, macOS 10.15, *) {
+                isServerTrusted = SecTrustEvaluateWithError(serverTrust, nil)
+            } else {
+                var result = SecTrustResultType.invalid
+                let status = SecTrustEvaluate(serverTrust, &result)
+                isServerTrusted = (status == errSecSuccess) && (result == .unspecified || result == .proceed)
+            }
+            #else
+            var result = SecTrustResultType.invalid
+            let status = SecTrustEvaluate(serverTrust, &result)
+            isServerTrusted = (status == errSecSuccess) && (result == .unspecified || result == .proceed)
+            #endif
+
+            if isServerTrusted {
+                // Check that the certificate's CN or SAN matches the expected hostname
+                if let serverCertificate = SecTrustGetCertificateAtIndex(serverTrust, 0) {
+                    var commonName: CFString?
+                    SecCertificateCopyCommonName(serverCertificate, &commonName)
+                    let cn = commonName as String?
+
+                    // Check SAN (Subject Alternative Name)
+                    var sanMatches = false
+                    if let values = SecCertificateCopyValues(serverCertificate, [kSecOIDSubjectAltName] as CFArray, nil) as? [CFString: Any],
+                       let sanDict = values[kSecOIDSubjectAltName] as? [CFString: Any],
+                       let sanValueList = sanDict[kSecPropertyKeyValue] as? [[CFString: Any]] {
+                        for sanEntry in sanValueList {
+                            if let label = sanEntry[kSecPropertyKeyLabel] as? String,
+                               (label == "DNS Name" || label == "2.5.29.17"),
+                               let value = sanEntry[kSecPropertyKeyValue] as? String,
+                               value.caseInsensitiveCompare(expectedHostname) == .orderedSame {
+                                sanMatches = true
+                                break
+                            }
+                        }
+                    }
+
+                    if (cn?.caseInsensitiveCompare(expectedHostname) == .orderedSame) || sanMatches {
+                        let credential = URLCredential(trust: serverTrust)
+                        completionHandler(.useCredential, credential)
+                        return
+                    }
+                }
+            }
+            // If we get here, validation failed
+            completionHandler(.cancelAuthenticationChallenge, nil)
         } else {
             completionHandler(.performDefaultHandling, nil)
         }

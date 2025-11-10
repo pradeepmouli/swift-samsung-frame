@@ -326,7 +326,7 @@ actor RemoteControl: RemoteControlProtocol {
 /// let apps = try await client.apps.list()
 ///
 /// // Launch an app
-/// try await client.apps.launch("111299001912") // YouTube
+/// try await client.apps.launch("111299000912") // YouTube
 ///
 /// // Check app status
 /// let status = try await client.apps.status(of: "111299001912")

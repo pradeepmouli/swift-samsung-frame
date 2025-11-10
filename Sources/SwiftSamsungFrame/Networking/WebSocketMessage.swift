@@ -112,14 +112,14 @@ public struct AppListMessage: Sendable, Codable {
     }
     
     /// Create message to launch app
-    static func launchApp(appID: String, appType: String = "DEEP_LINK", metaTag: String = "") -> AppListMessage {
+    static func launchApp(appID: String, appType: String = "DEEP_LINK", metaTag: String = "") throws -> AppListMessage {
         let dataDict: [String: Any] = [
             "appId": appID,
             "action_type": appType,
             "metaTag": metaTag
         ]
         
-        let jsonData = try! JSONSerialization.data(withJSONObject: dataDict)
+        let jsonData = try JSONSerialization.data(withJSONObject: dataDict)
         let jsonString = String(data: jsonData, encoding: .utf8)!
         
         return AppListMessage(

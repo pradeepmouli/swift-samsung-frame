@@ -151,7 +151,8 @@ actor SSDPBrowser {
                     }
                     
                     if let content, let response = String(data: content, encoding: .utf8) {
-                        Task {
+                        Task { [weak self] in
+                            guard let self else { return }
                             await self.processResponse(response, continuation: continuation)
                         }
                     }

@@ -179,7 +179,7 @@ actor SSDPBrowser {
         var server: String?
         
         for line in lines {
-            let parts = line.components(separatedBy: ": ")
+            let parts = line.split(separator: ":", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }
             guard parts.count == 2 else { continue }
             
             let key = parts[0].uppercased()

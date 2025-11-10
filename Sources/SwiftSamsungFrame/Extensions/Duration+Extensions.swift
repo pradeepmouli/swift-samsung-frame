@@ -1,6 +1,6 @@
 // Duration Extensions - Helper methods for Duration
-// Note: Duration.milliseconds() and Duration.seconds() are already available in Swift 6
-// This file provides convenience methods for converting Duration to numeric values
+// Note: Duration has static factory methods .seconds() and .milliseconds() for construction
+// This file provides instance methods for extracting numeric values from Duration objects
 
 import Foundation
 

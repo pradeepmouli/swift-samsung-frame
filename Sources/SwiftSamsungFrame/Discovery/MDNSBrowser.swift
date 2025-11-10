@@ -136,8 +136,20 @@ actor MDNSBrowser {
         // Resolve the endpoint to get IP address
         let connection = NWConnection(to: result.endpoint, using: .tcp)
         
-        await withCheckedContinuation { innerContinuation in
-            connection.stateUpdateHandler = { state in
+        await withCheckedContinuation { (innerContinuation: CheckedContinuation<Void, Never>) in
+            var hasResumed = false
+            let resumeLock = NSLock()
+            
+            func resumeOnce() {
+                resumeLock.lock()
+                defer { resumeLock.unlock() }
+                if !hasResumed {
+                    hasResumed = true
+                    innerContinuation.resume()
+                }
+            }
+            
+            connection.stateUpdateHandler = { [weak self] state in
                 switch state {
                 case .ready:
                     if let endpoint = connection.currentPath?.remoteEndpoint,
@@ -175,16 +187,16 @@ actor MDNSBrowser {
                         )
                         
                         Task { [weak self] in
-                            guard let self = self else { return }
+                            guard let self else { return }
                             await self.handleDiscovery(discoveryResult, continuation: continuation)
                         }
                     }
                     connection.cancel()
-                    innerContinuation.resume()
+                    resumeOnce()
                     
                 case .failed, .cancelled:
                     connection.cancel()
-                    innerContinuation.resume()
+                    resumeOnce()
                     
                 default:
                     break
@@ -198,7 +210,7 @@ actor MDNSBrowser {
             Task {
                 try? await Task.sleep(for: .seconds(5))
                 connection.cancel()
-                innerContinuation.resume()
+                resumeOnce()
             }
         }
     }

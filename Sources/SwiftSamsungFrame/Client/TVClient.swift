@@ -244,6 +244,8 @@ actor RemoteControl: RemoteControlProtocol {
     }
     
     public func volumeUp(steps: Int = 1) async throws {
+        guard steps > 0 else { return }
+        
         #if canImport(OSLog)
         Logger.commands.info("Increasing volume by \(steps) steps")
         #endif
@@ -255,6 +257,8 @@ actor RemoteControl: RemoteControlProtocol {
     }
     
     public func volumeDown(steps: Int = 1) async throws {
+        guard steps > 0 else { return }
+        
         #if canImport(OSLog)
         Logger.commands.info("Decreasing volume by \(steps) steps")
         #endif

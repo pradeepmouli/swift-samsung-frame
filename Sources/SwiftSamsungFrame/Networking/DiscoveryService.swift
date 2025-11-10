@@ -8,7 +8,7 @@ import OSLog
 #endif
 
 /// Service for discovering Samsung TVs on the local network
-public final class DiscoveryService: DiscoveryServiceProtocol, @unchecked Sendable {
+public actor DiscoveryService: DiscoveryServiceProtocol {
     private var mdnsBrowser: MDNSBrowser?
     private var ssdpBrowser: SSDPBrowser?
     private var isDiscovering = false
@@ -19,23 +19,23 @@ public final class DiscoveryService: DiscoveryServiceProtocol, @unchecked Sendab
     /// Discover TVs on local network
     /// - Parameter timeout: Discovery timeout duration (default: 10 seconds)
     /// - Returns: AsyncStream of discovered devices
-    public func discover(timeout: Duration = .seconds(10)) -> AsyncStream<DiscoveryResult> {
+    public nonisolated func discover(timeout: Duration = .seconds(10)) -> AsyncStream<DiscoveryResult> {
         return AsyncStream { continuation in
-            // Cancel any existing discovery
-            self.cancel()
-            
             // Start new discovery task
-            self.discoveryTask = Task {
-                await self.startDiscovery(timeout: timeout, continuation: continuation)
+            Task {
+                await self.performDiscovery(timeout: timeout, continuation: continuation)
             }
         }
     }
     
-    /// Start discovery process with mDNS first, then SSDP fallback
-    private func startDiscovery(
+    /// Perform discovery with cross-protocol deduplication
+    private func performDiscovery(
         timeout: Duration,
         continuation: AsyncStream<DiscoveryResult>.Continuation
     ) async {
+        // Cancel any existing discovery
+        await cancelInternal()
+        
         guard !isDiscovering else { return }
         
         isDiscovering = true
@@ -45,6 +45,9 @@ public final class DiscoveryService: DiscoveryServiceProtocol, @unchecked Sendab
         #if canImport(OSLog)
         Logger.discovery.info("Starting TV discovery with \(timeout.seconds())s timeout")
         #endif
+        
+        // Track discovered devices for cross-protocol deduplication
+        var discoveredDevices: Set<String> = []
         
         // Discovery strategy: mDNS first (3s), then SSDP for remaining time
         let mdnsTimeout = Duration.seconds(3)
@@ -57,7 +60,19 @@ public final class DiscoveryService: DiscoveryServiceProtocol, @unchecked Sendab
             Logger.discovery.debug("Phase 1: mDNS discovery (\(mdnsTimeout.seconds())s)")
             #endif
             
-            await mdnsBrowser.discover(timeout: mdnsTimeout, continuation: continuation)
+            let mdnsStream = AsyncStream<DiscoveryResult> { mdnsContinuation in
+                Task {
+                    await mdnsBrowser.discover(timeout: mdnsTimeout, continuation: mdnsContinuation)
+                }
+            }
+            
+            for await result in mdnsStream {
+                let deviceId = result.device.id
+                if !discoveredDevices.contains(deviceId) {
+                    discoveredDevices.insert(deviceId)
+                    continuation.yield(result)
+                }
+            }
         }
         
         // Phase 2: Try SSDP for remaining time (fallback for older models)
@@ -66,19 +81,38 @@ public final class DiscoveryService: DiscoveryServiceProtocol, @unchecked Sendab
             Logger.discovery.debug("Phase 2: SSDP discovery (\(ssdpTimeout.seconds())s)")
             #endif
             
-            await ssdpBrowser.discover(timeout: ssdpTimeout, continuation: continuation)
+            let ssdpStream = AsyncStream<DiscoveryResult> { ssdpContinuation in
+                Task {
+                    await ssdpBrowser.discover(timeout: ssdpTimeout, continuation: ssdpContinuation)
+                }
+            }
+            
+            for await result in ssdpStream {
+                let deviceId = result.device.id
+                if !discoveredDevices.contains(deviceId) {
+                    discoveredDevices.insert(deviceId)
+                    continuation.yield(result)
+                }
+            }
         }
         
         isDiscovering = false
         continuation.finish()
         
         #if canImport(OSLog)
-        Logger.discovery.info("TV discovery completed")
+        Logger.discovery.info("TV discovery completed. Found \(discoveredDevices.count) unique devices")
         #endif
     }
     
     /// Cancel ongoing discovery
-    public func cancel() {
+    public nonisolated func cancel() {
+        Task {
+            await cancelInternal()
+        }
+    }
+    
+    /// Internal cancellation method
+    private func cancelInternal() async {
         #if canImport(OSLog)
         Logger.discovery.info("Cancelling TV discovery")
         #endif
@@ -87,12 +121,10 @@ public final class DiscoveryService: DiscoveryServiceProtocol, @unchecked Sendab
         discoveryTask = nil
         isDiscovering = false
         
-        Task {
-            await mdnsBrowser?.stop()
-            await ssdpBrowser?.stop()
-            mdnsBrowser = nil
-            ssdpBrowser = nil
-        }
+        await mdnsBrowser?.stop()
+        await ssdpBrowser?.stop()
+        mdnsBrowser = nil
+        ssdpBrowser = nil
     }
     
     /// Quick scan for specific TV at known IP address

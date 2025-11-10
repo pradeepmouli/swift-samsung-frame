@@ -12,7 +12,7 @@ public enum TVError: Error, Sendable {
     case authenticationRequired
     
     /// Authentication failed or was rejected
-    case authenticationFailed
+    case authenticationFailed(reason: String? = nil)
     
     /// Operation timed out
     case timeout(operation: String, error: String? = nil)
@@ -52,8 +52,12 @@ extension TVError: LocalizedError {
             return "Connection failed: \(reason)"
         case .authenticationRequired:
             return "Authentication required. Please approve the connection on your TV."
-        case .authenticationFailed:
-            return "Authentication failed. The connection was rejected."
+        case .authenticationFailed(let reason):
+            if let reason {
+                return "Authentication failed: \(reason)"
+            } else {
+                return "Authentication failed. The connection was rejected."
+            }
         case .timeout(let operation, let error):
             if let error {
                 return "Operation timed out: \(operation) - \(error)"

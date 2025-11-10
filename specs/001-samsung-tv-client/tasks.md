@@ -100,20 +100,20 @@ From spec.md:
 
 ### Implementation for User Story 1
 
-- [ ] T034 [P] [US1] Create RemoteControl class in Sources/SwiftSamsungFrame/Commands/RemoteControl.swift conforming to RemoteControlProtocol
-- [ ] T035 [US1] Implement sendKey() method formatting and sending WebSocket command messages in RemoteControl
-- [ ] T036 [US1] Implement sendKeys() method with configurable delay between commands in RemoteControl
-- [ ] T037 [P] [US1] Implement power() convenience method in RemoteControl
-- [ ] T038 [P] [US1] Implement volumeUp() and volumeDown() methods with steps parameter in RemoteControl
-- [ ] T039 [P] [US1] Implement mute() method in RemoteControl
-- [ ] T040 [P] [US1] Implement navigate() method accepting NavigationDirection in RemoteControl
-- [ ] T041 [P] [US1] Implement enter(), back(), and home() convenience methods in RemoteControl
-- [ ] T042 [US1] Integrate RemoteControl as property in TVClient (var remote: RemoteControlProtocol)
-- [ ] T043 [US1] Add command timeout handling (5 second timeout) in RemoteControl
-- [ ] T044 [US1] Add command retry logic (retry once after 500ms) in RemoteControl
-- [ ] T045 [US1] Implement deviceInfo() method in TVClient using REST API endpoint
-- [ ] T046 [US1] Add comprehensive doc comments (///) for all public RemoteControl APIs
-- [ ] T047 [US1] Add logging with OSLog for command execution
+- [x] T034 [P] [US1] Create RemoteControl class in Sources/SwiftSamsungFrame/Commands/RemoteControl.swift conforming to RemoteControlProtocol (Note: Implemented in TVClient.swift as actor)
+- [x] T035 [US1] Implement sendKey() method formatting and sending WebSocket command messages in RemoteControl
+- [x] T036 [US1] Implement sendKeys() method with configurable delay between commands in RemoteControl
+- [x] T037 [P] [US1] Implement power() convenience method in RemoteControl
+- [x] T038 [P] [US1] Implement volumeUp() and volumeDown() methods with steps parameter in RemoteControl
+- [x] T039 [P] [US1] Implement mute() method in RemoteControl
+- [x] T040 [P] [US1] Implement navigate() method accepting NavigationDirection in RemoteControl
+- [x] T041 [P] [US1] Implement enter(), back(), and home() convenience methods in RemoteControl
+- [x] T042 [US1] Integrate RemoteControl as property in TVClient (var remote: RemoteControlProtocol)
+- [x] T043 [US1] Add command timeout handling (5 second timeout) in RemoteControl
+- [x] T044 [US1] Add command retry logic (retry once after 500ms) in RemoteControl
+- [x] T045 [US1] Implement deviceInfo() method in TVClient using REST API endpoint
+- [x] T046 [US1] Add comprehensive doc comments (///) for all public RemoteControl APIs
+- [x] T047 [US1] Add logging with OSLog for command execution
 
 **Checkpoint**: At this point, both US4 and US1 work together - full MVP with connection + basic control
 
@@ -129,20 +129,20 @@ From spec.md:
 
 ### Implementation for User Story 5
 
-- [ ] T048 [P] [US5] Create DiscoveryService class in Sources/SwiftSamsungFrame/Discovery/DiscoveryService.swift conforming to DiscoveryServiceProtocol
-- [ ] T049 [P] [US5] Implement mDNS browser using Network framework NWBrowser in Sources/SwiftSamsungFrame/Discovery/MDNSBrowser.swift
-- [ ] T050 [P] [US5] Implement SSDP discovery using NWConnection for UDP multicast in Sources/SwiftSamsungFrame/Discovery/SSDPBrowser.swift
-- [ ] T051 [US5] Implement discover() method returning AsyncStream<DiscoveryResult> in DiscoveryService
-- [ ] T052 [US5] Implement mDNS service discovery for "_samsung-remote._tcp.local." service type in MDNSBrowser
-- [ ] T053 [US5] Implement SSDP M-SEARCH multicast to 239.255.255.250:1900 in SSDPBrowser
-- [ ] T054 [US5] Parse mDNS TXT records to filter for Frame TV models in MDNSBrowser
-- [ ] T055 [US5] Parse SSDP responses for Samsung TV URN "urn:samsung.com:device:RemoteControlReceiver" in SSDPBrowser
-- [ ] T056 [US5] Implement discovery strategy: try mDNS first (3s), fallback to SSDP (7s total) in DiscoveryService
-- [ ] T057 [US5] Implement find(at:) method for quick validation of known IP address in DiscoveryService
-- [ ] T058 [US5] Implement cancel() method to stop discovery in DiscoveryService
-- [ ] T059 [US5] Add AsyncStream integration for concurrent discovery results in DiscoveryService
-- [ ] T060 [US5] Add comprehensive doc comments (///) for all public DiscoveryService APIs
-- [ ] T061 [US5] Add logging with OSLog for discovery events
+- [x] T048 [P] [US5] Create DiscoveryService class in Sources/SwiftSamsungFrame/Discovery/DiscoveryService.swift conforming to DiscoveryServiceProtocol (Note: Enhanced existing implementation in Networking/DiscoveryService.swift)
+- [x] T049 [P] [US5] Implement mDNS browser using Network framework NWBrowser in Sources/SwiftSamsungFrame/Discovery/MDNSBrowser.swift
+- [x] T050 [P] [US5] Implement SSDP discovery using NWConnection for UDP multicast in Sources/SwiftSamsungFrame/Discovery/SSDPBrowser.swift
+- [x] T051 [US5] Implement discover() method returning AsyncStream<DiscoveryResult> in DiscoveryService
+- [x] T052 [US5] Implement mDNS service discovery for "_samsung-remote._tcp.local." service type in MDNSBrowser
+- [x] T053 [US5] Implement SSDP M-SEARCH multicast to 239.255.255.250:1900 in SSDPBrowser
+- [ ] T054 [US5] Parse mDNS TXT records to filter for Frame TV models in MDNSBrowser (Note: TXT records available but basic filtering implemented)
+- [x] T055 [US5] Parse SSDP responses for Samsung TV URN "urn:samsung.com:device:RemoteControlReceiver" in SSDPBrowser
+- [x] T056 [US5] Implement discovery strategy: try mDNS first (3s), fallback to SSDP (7s total) in DiscoveryService
+- [x] T057 [US5] Implement find(at:) method for quick validation of known IP address in DiscoveryService
+- [x] T058 [US5] Implement cancel() method to stop discovery in DiscoveryService
+- [x] T059 [US5] Add AsyncStream integration for concurrent discovery results in DiscoveryService
+- [x] T060 [US5] Add comprehensive doc comments (///) for all public DiscoveryService APIs
+- [x] T061 [US5] Add logging with OSLog for discovery events
 
 **Checkpoint**: Discovery works independently - can find TVs without needing connection
 

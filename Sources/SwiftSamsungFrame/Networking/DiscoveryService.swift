@@ -3,75 +3,137 @@
 
 import Foundation
 
+#if canImport(OSLog)
+import OSLog
+#endif
+
 /// Service for discovering Samsung TVs on the local network
-public final class DiscoveryService: DiscoveryServiceProtocol, @unchecked Sendable {
+public actor DiscoveryService: DiscoveryServiceProtocol {
+    private var mdnsBrowser: MDNSBrowser?
+    private var ssdpBrowser: SSDPBrowser?
     private var isDiscovering = false
-    private var continuation: AsyncStream<DiscoveryResult>.Continuation?
+    private var discoveryTask: Task<Void, Never>?
     
     public init() {}
     
     /// Discover TVs on local network
-    /// - Parameter timeout: Discovery timeout duration
+    /// - Parameter timeout: Discovery timeout duration (default: 10 seconds)
     /// - Returns: AsyncStream of discovered devices
-    public func discover(timeout: Duration = .seconds(5)) -> AsyncStream<DiscoveryResult> {
+    public nonisolated func discover(timeout: Duration = .seconds(10)) -> AsyncStream<DiscoveryResult> {
         return AsyncStream { continuation in
-            self.continuation = continuation
-            
+            // Start new discovery task
             Task {
-                await self.startDiscovery(timeout: timeout)
+                await self.performDiscovery(timeout: timeout, continuation: continuation)
             }
         }
     }
     
-    /// Start discovery process
-    private func startDiscovery(timeout: Duration) async {
+    /// Perform discovery with cross-protocol deduplication
+    private func performDiscovery(
+        timeout: Duration,
+        continuation: AsyncStream<DiscoveryResult>.Continuation
+    ) async {
+        // Cancel any existing discovery
+        await cancelInternal()
+        
         guard !isDiscovering else { return }
         
         isDiscovering = true
+        mdnsBrowser = MDNSBrowser()
+        ssdpBrowser = SSDPBrowser()
         
         #if canImport(OSLog)
-        Logger.connection.info("Starting TV discovery")
+        Logger.discovery.info("Starting TV discovery with \(timeout.seconds())s timeout")
         #endif
         
-        // Note: This is a stub implementation
-        // Full implementation would:
-        // 1. Start mDNS/Bonjour discovery for _samsung-remote._tcp
-        // 2. Start SSDP discovery for Samsung TVs
-        // 3. Combine results and deduplicate
-        // 4. Emit discoveries through continuation
+        // Track discovered devices for cross-protocol deduplication
+        var discoveredDevices: Set<String> = []
         
-        // Wait for timeout
-        do {
-            try await Task.sleep(for: timeout)
-        } catch {
-            // Cancelled
+        // Discovery strategy: mDNS first (3s), then SSDP for remaining time
+        let mdnsTimeout = Duration.seconds(3)
+        let remainingTime = timeout.seconds() - mdnsTimeout.seconds()
+        let ssdpTimeout = Duration.seconds(max(0, remainingTime))
+        
+        // Phase 1: Try mDNS first (best for Frame TVs and modern Samsung TVs)
+        if let mdnsBrowser {
+            #if canImport(OSLog)
+            Logger.discovery.debug("Phase 1: mDNS discovery (\(mdnsTimeout.seconds())s)")
+            #endif
+            
+            let mdnsStream = AsyncStream<DiscoveryResult> { mdnsContinuation in
+                Task {
+                    await mdnsBrowser.discover(timeout: mdnsTimeout, continuation: mdnsContinuation)
+                }
+            }
+            
+            for await result in mdnsStream {
+                let deviceId = result.device.id
+                if !discoveredDevices.contains(deviceId) {
+                    discoveredDevices.insert(deviceId)
+                    continuation.yield(result)
+                }
+            }
+        }
+        
+        // Phase 2: Try SSDP for remaining time (fallback for older models)
+        if ssdpTimeout.seconds() > 0, let ssdpBrowser {
+            #if canImport(OSLog)
+            Logger.discovery.debug("Phase 2: SSDP discovery (\(ssdpTimeout.seconds())s)")
+            #endif
+            
+            let ssdpStream = AsyncStream<DiscoveryResult> { ssdpContinuation in
+                Task {
+                    await ssdpBrowser.discover(timeout: ssdpTimeout, continuation: ssdpContinuation)
+                }
+            }
+            
+            for await result in ssdpStream {
+                let deviceId = result.device.id
+                if !discoveredDevices.contains(deviceId) {
+                    discoveredDevices.insert(deviceId)
+                    continuation.yield(result)
+                }
+            }
         }
         
         isDiscovering = false
-        continuation?.finish()
+        continuation.finish()
         
         #if canImport(OSLog)
-        Logger.connection.info("TV discovery completed")
+        Logger.discovery.info("TV discovery completed. Found \(discoveredDevices.count) unique devices")
         #endif
     }
     
     /// Cancel ongoing discovery
-    public func cancel() {
-        isDiscovering = false
-        continuation?.finish()
-        
-        #if canImport(OSLog)
-        Logger.connection.info("TV discovery cancelled")
-        #endif
+    public nonisolated func cancel() {
+        Task {
+            await cancelInternal()
+        }
     }
     
-    /// Quick scan for specific TV
+    /// Internal cancellation method
+    private func cancelInternal() async {
+        #if canImport(OSLog)
+        Logger.discovery.info("Cancelling TV discovery")
+        #endif
+        
+        discoveryTask?.cancel()
+        discoveryTask = nil
+        isDiscovering = false
+        
+        await mdnsBrowser?.stop()
+        await ssdpBrowser?.stop()
+        mdnsBrowser = nil
+        ssdpBrowser = nil
+    }
+    
+    /// Quick scan for specific TV at known IP address
     /// - Parameter host: Known IP address to check
     /// - Returns: Discovery result if TV found
     /// - Throws: TVError.deviceNotFound
     public func find(at host: String) async throws -> DiscoveryResult {
         #if canImport(OSLog)
-        Logger.connection.debug("Checking for TV at: \(host)")
+        Logger.discovery.debug("Checking for TV at: \(host)")
         #endif
         
         // Try to connect to the REST API to verify it's a Samsung TV
@@ -85,6 +147,10 @@ public final class DiscoveryService: DiscoveryServiceProtocol, @unchecked Sendab
                let device = json["device"] as? [String: Any],
                let name = device["name"] as? String,
                let modelName = device["modelName"] as? String {
+                
+                #if canImport(OSLog)
+                Logger.discovery.info("Found Samsung TV at \(host): \(name) (\(modelName))")
+                #endif
                 
                 return DiscoveryResult(
                     device: TVDevice(
@@ -101,6 +167,10 @@ public final class DiscoveryService: DiscoveryServiceProtocol, @unchecked Sendab
             
             throw TVError.deviceNotFound(id: host)
         } catch {
+            #if canImport(OSLog)
+            Logger.discovery.error("No Samsung TV found at \(host): \(error.localizedDescription)")
+            #endif
+            
             throw TVError.deviceNotFound(id: host)
         }
     }

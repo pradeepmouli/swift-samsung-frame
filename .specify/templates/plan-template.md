@@ -18,13 +18,13 @@
 -->
 
 **Language/Version**: Swift 6.2+ (strict concurrency enabled)
-**Primary Dependencies**: [e.g., swift-collections, AsyncHTTPClient or NEEDS CLARIFICATION]  
-**Storage**: [if applicable, e.g., SwiftData, CoreData, UserDefaults or N/A]  
+**Primary Dependencies**: [e.g., swift-collections, AsyncHTTPClient or NEEDS CLARIFICATION]
+**Storage**: [if applicable, e.g., SwiftData, CoreData, UserDefaults or N/A]
 **Testing**: XCTest with async test support
 **Target Platform**: macOS 15+, iOS 18+, tvOS 18+, watchOS 11+
 **Project Type**: Swift Package (library)
-**Performance Goals**: [domain-specific, e.g., <10ms response time, 60 fps rendering or NEEDS CLARIFICATION]  
-**Constraints**: [domain-specific, e.g., <50MB memory, offline-capable, no network required or NEEDS CLARIFICATION]  
+**Performance Goals**: [domain-specific, e.g., <10ms response time, 60 fps rendering or NEEDS CLARIFICATION]
+**Constraints**: [domain-specific, e.g., <50MB memory, offline-capable, no network required or NEEDS CLARIFICATION]
 **Scale/Scope**: [domain-specific, e.g., 1M operations/sec, 100k LOC, 20 public APIs or NEEDS CLARIFICATION]
 
 ## Constitution Check
@@ -60,7 +60,7 @@ specs/[###-feature]/
 <!--
   ACTION REQUIRED: Replace the placeholder tree below with the concrete layout
   for this feature. Delete unused options and expand the chosen structure with
-  real paths (e.g., Sources/FeatureName, Tests/FeatureNameTests). The delivered 
+  real paths (e.g., Sources/FeatureName, Tests/FeatureNameTests). The delivered
   plan must not include Option labels.
 -->
 

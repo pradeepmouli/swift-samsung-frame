@@ -355,11 +355,11 @@ let session = URLSession(configuration: config)
 ```swift
 func performRequest<T: Decodable>(_ request: URLRequest) async throws -> T {
     let (data, response) = try await session.data(for: request)
-    
+
     guard let httpResponse = response as? HTTPURLResponse else {
         throw TVError.invalidResponse
     }
-    
+
     switch httpResponse.statusCode {
     case 200...299:
         return try JSONDecoder().decode(T.self, from: data)
@@ -381,19 +381,19 @@ func performRequest<T: Decodable>(_ request: URLRequest) async throws -> T {
 func uploadArt(imageData: Data, matte: String?) async throws -> String {
     var request = URLRequest(url: uploadURL)
     request.httpMethod = "POST"
-    
+
     let boundary = "Boundary-\(UUID().uuidString)"
     request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-    
+
     var body = Data()
-    
+
     // Add image file
     body.append("--\(boundary)\r\n".data(using: .utf8)!)
     body.append("Content-Disposition: form-data; name=\"file\"; filename=\"art.jpg\"\r\n".data(using: .utf8)!)
     body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
     body.append(imageData)
     body.append("\r\n".data(using: .utf8)!)
-    
+
     // Add matte if provided
     if let matte = matte {
         body.append("--\(boundary)\r\n".data(using: .utf8)!)
@@ -401,11 +401,11 @@ func uploadArt(imageData: Data, matte: String?) async throws -> String {
         body.append(matte.data(using: .utf8)!)
         body.append("\r\n".data(using: .utf8)!)
     }
-    
+
     body.append("--\(boundary)--\r\n".data(using: .utf8)!)
-    
+
     request.httpBody = body
-    
+
     let response: UploadResponse = try await performRequest(request)
     return response.content_id
 }

@@ -288,11 +288,11 @@ class MyTVDelegate: TVClientDelegate {
     func client(_ client: TVClient, didChangeState state: ConnectionState) async {
         print("Connection state changed to: \(state)")
     }
-    
+
     func clientRequiresAuthentication(_ client: TVClient) async {
         print("Please approve the connection on your TV")
     }
-    
+
     func client(_ client: TVClient, didEncounterError error: TVError) async {
         print("Error: \(error)")
     }
@@ -335,7 +335,7 @@ func connectWithRetry(to host: String, maxAttempts: Int = 3) async throws {
 func navigateToNetflix() async throws {
     try await client.remote.home()
     try await Task.sleep(for: .seconds(1))
-    
+
     try await client.remote.sendKeys([
         .down,
         .right,
@@ -353,20 +353,20 @@ func displayCustomArt(imageURL: URL) async throws {
     guard try await client.art.isSupported() else {
         throw TVError.artModeNotSupported
     }
-    
+
     // Load image
     let imageData = try Data(contentsOf: imageURL)
-    
+
     // Upload
     let artID = try await client.art.upload(
         imageData,
         type: .jpeg,
         matte: .classicWoodLight
     )
-    
+
     // Display
     try await client.art.select(artID, show: true)
-    
+
     print("Custom art displayed successfully!")
 }
 ```
@@ -436,7 +436,7 @@ func connectAndWaitForAuth(to host: String) async throws {
     } catch TVError.authenticationRequired {
         // Show UI prompt to user
         await showAuthPrompt("Approve connection on your TV")
-        
+
         // Wait for connection to complete
         // (library handles auth internally)
     }
@@ -493,7 +493,7 @@ struct RemoteControlView: View {
     @State private var client = TVClient()
     @State private var isConnected = false
     @State private var errorMessage: String?
-    
+
     var body: some View {
         VStack {
             if isConnected {
@@ -501,7 +501,7 @@ struct RemoteControlView: View {
                     Button("▲") {
                         Task { try? await client.remote.navigate(.up) }
                     }
-                    
+
                     HStack {
                         Button("◀") {
                             Task { try? await client.remote.navigate(.left) }
@@ -513,7 +513,7 @@ struct RemoteControlView: View {
                             Task { try? await client.remote.navigate(.right) }
                         }
                     }
-                    
+
                     Button("▼") {
                         Task { try? await client.remote.navigate(.down) }
                     }
@@ -531,7 +531,7 @@ struct RemoteControlView: View {
                     }
                 }
             }
-            
+
             if let error = errorMessage {
                 Text(error)
                     .foregroundColor(.red)

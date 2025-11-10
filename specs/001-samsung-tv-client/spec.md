@@ -1,8 +1,8 @@
 # Feature Specification: Samsung TV Client Library
 
-**Feature Branch**: `001-samsung-tv-client`  
-**Created**: 2025-11-09  
-**Status**: Draft  
+**Feature Branch**: `001-samsung-tv-client`
+**Created**: 2025-11-09
+**Status**: Draft
 **Input**: User description: "swift implementation of client for samsung frame tv apis (rest, websocket, etc..) using the samsung-tv-ws-api python library as a reference: https://github.com/xchwarze/samsung-tv-ws-api/tree/art-updates"
 
 ## User Scenarios & Testing *(mandatory)*

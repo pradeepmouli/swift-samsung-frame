@@ -58,12 +58,12 @@ This document consolidates research findings for implementing a Swift client lib
   - NWBrowser automatically resolves IP addresses and ports
   - Filter results for Frame TV models via TXT records
   - Integrate with AsyncStream for Swift concurrency
-  
+
 - **SSDP Discovery** (Fallback):
   - M-SEARCH multicast to 239.255.255.250:1900
   - Parse SSDP responses for Samsung TV identification (URN: `urn:samsung.com:device:RemoteControlReceiver`)
   - Custom UDP multicast implementation using NWConnection
-  
+
 - **Discovery Strategy**: Try mDNS first (3s timeout), fall back to SSDP if no Frame TVs found (7s timeout total)
 
 **Alternatives Considered**:
@@ -173,7 +173,7 @@ actor ConnectionManager {
     private var state: ConnectionState
     private var websocket: URLSessionWebSocketTask?
     private var authToken: String?
-    
+
     func connect(to host: String) async throws
     func send(message: Message) async throws
     func receive() async throws -> Message

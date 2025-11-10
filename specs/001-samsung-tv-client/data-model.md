@@ -358,12 +358,12 @@ enum KeyCode: String, Sendable, Codable {
     // Power
     case power = "KEY_POWER"
     case powerOff = "KEY_POWEROFF"
-    
+
     // Volume
     case volumeUp = "KEY_VOLUP"
     case volumeDown = "KEY_VOLDOWN"
     case mute = "KEY_MUTE"
-    
+
     // Navigation
     case up = "KEY_UP"
     case down = "KEY_DOWN"
@@ -371,26 +371,26 @@ enum KeyCode: String, Sendable, Codable {
     case right = "KEY_RIGHT"
     case enter = "KEY_ENTER"
     case back = "KEY_RETURN"
-    
+
     // Playback
     case play = "KEY_PLAY"
     case pause = "KEY_PAUSE"
     case stop = "KEY_STOP"
     case rewind = "KEY_REWIND"
     case fastForward = "KEY_FF"
-    
+
     // Channel
     case channelUp = "KEY_CHUP"
     case channelDown = "KEY_CHDOWN"
     case previousChannel = "KEY_PRECH"
-    
+
     // Menu
     case menu = "KEY_MENU"
     case home = "KEY_HOME"
     case exit = "KEY_EXIT"
     case source = "KEY_SOURCE"
     case tools = "KEY_TOOLS"
-    
+
     // Numbers
     case num0 = "KEY_0"
     case num1 = "KEY_1"

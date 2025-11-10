@@ -277,7 +277,7 @@ actor AppManagement: AppManagementProtocol {
         Logger.commands.info("Launching app: \(appID)")
         #endif
         
-        let message = AppListMessage.launchApp(appID: appID)
+        let message = try AppListMessage.launchApp(appID: appID)
         let data = try JSONEncoder().encode(message)
         try await webSocket.send(data)
     }

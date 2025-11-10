@@ -192,7 +192,7 @@ public protocol TokenStorageProtocol: Sendable {
 }
 
 /// Delegate protocol for TV client events
-public protocol TVClientDelegate: Sendable {
+public protocol TVClientDelegate: Sendable, AnyObject {
     /// Called when connection state changes
     /// - Parameter state: New connection state
     func tvClient(didChangeState state: ConnectionState) async

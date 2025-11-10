@@ -170,4 +170,95 @@ public final class RESTClient: @unchecked Sendable {
         
         return data
     }
+    
+    /// Get app status
+    /// - Parameter appID: App identifier
+    /// - Returns: App status data
+    /// - Throws: TVError if request fails
+    public func getAppStatus(appID: String) async throws -> Data {
+        let url = baseURL.appendingPathComponent("/api/v2/applications/\(appID)")
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        
+        let (data, response) = try await session.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw TVError.invalidResponse(details: "Invalid response type")
+        }
+        
+        guard (200...299).contains(httpResponse.statusCode) else {
+            throw TVError.commandFailed(
+                code: httpResponse.statusCode,
+                message: "Failed to get app status"
+            )
+        }
+        
+        return data
+    }
+    
+    /// Launch app via REST API
+    /// - Parameter appID: App identifier
+    /// - Throws: TVError if request fails
+    public func launchApp(appID: String) async throws {
+        let url = baseURL.appendingPathComponent("/api/v2/applications/\(appID)")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        
+        let (_, response) = try await session.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw TVError.invalidResponse(details: "Invalid response type")
+        }
+        
+        guard (200...299).contains(httpResponse.statusCode) else {
+            throw TVError.commandFailed(
+                code: httpResponse.statusCode,
+                message: "Failed to launch app"
+            )
+        }
+    }
+    
+    /// Close app via REST API
+    /// - Parameter appID: App identifier
+    /// - Throws: TVError if request fails
+    public func closeApp(appID: String) async throws {
+        let url = baseURL.appendingPathComponent("/api/v2/applications/\(appID)")
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        
+        let (_, response) = try await session.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw TVError.invalidResponse(details: "Invalid response type")
+        }
+        
+        guard (200...299).contains(httpResponse.statusCode) else {
+            throw TVError.commandFailed(
+                code: httpResponse.statusCode,
+                message: "Failed to close app"
+            )
+        }
+    }
+    
+    /// Install app via REST API
+    /// - Parameter appID: App identifier
+    /// - Throws: TVError if request fails
+    public func installApp(appID: String) async throws {
+        let url = baseURL.appendingPathComponent("/api/v2/applications/\(appID)")
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        
+        let (_, response) = try await session.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw TVError.invalidResponse(details: "Invalid response type")
+        }
+        
+        guard (200...299).contains(httpResponse.statusCode) else {
+            throw TVError.commandFailed(
+                code: httpResponse.statusCode,
+                message: "Failed to install app"
+            )
+        }
+    }
 }

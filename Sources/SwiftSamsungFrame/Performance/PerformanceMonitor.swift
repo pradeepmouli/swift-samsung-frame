@@ -283,7 +283,7 @@ extension PerformanceMonitor {
     ) async rethrows -> T {
         #if canImport(os.signpost)
         if #available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, *) {
-            return try await SignpostMonitor.trace("Discovery: \(label)") {
+            return try await SignpostMonitor.trace("Discovery: %@", label) {
                 try await measureWithThreshold(label, threshold: 10.0, operation: operation)
             }
         }

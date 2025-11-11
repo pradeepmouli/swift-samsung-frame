@@ -50,13 +50,19 @@ public actor D2DSocketClient {
         // Start connection
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             var isResumed = false
+            // NSLock is used here because stateUpdateHandler is called on a different queue
+            // (the DispatchQueue created below), while the timeout Task runs on the actor's executor.
+            // This prevents race conditions when both try to resume the continuation.
             let resumeLock = NSLock()
+            var timeoutTask: Task<Void, Never>?
             
             func resumeOnce(with result: Result<Void, Error>) {
                 resumeLock.lock()
                 defer { resumeLock.unlock() }
                 if !isResumed {
                     isResumed = true
+                    timeoutTask?.cancel()
+                    conn.stateUpdateHandler = nil
                     continuation.resume(with: result)
                 }
             }
@@ -90,7 +96,7 @@ public actor D2DSocketClient {
             conn.start(queue: queue)
             
             // Set timeout
-            Task {
+            timeoutTask = Task {
                 try? await Task.sleep(for: self.timeout)
                 resumeOnce(with: .failure(TVError.timeout))
             }
@@ -145,13 +151,19 @@ public actor D2DSocketClient {
         // Start connection
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             var isResumed = false
+            // NSLock is used here because stateUpdateHandler is called on a different queue
+            // (the DispatchQueue created below), while the timeout Task runs on the actor's executor.
+            // This prevents race conditions when both try to resume the continuation.
             let resumeLock = NSLock()
+            var timeoutTask: Task<Void, Never>?
             
             func resumeOnce(with result: Result<Void, Error>) {
                 resumeLock.lock()
                 defer { resumeLock.unlock() }
                 if !isResumed {
                     isResumed = true
+                    timeoutTask?.cancel()
+                    conn.stateUpdateHandler = nil
                     continuation.resume(with: result)
                 }
             }
@@ -185,7 +197,7 @@ public actor D2DSocketClient {
             conn.start(queue: queue)
             
             // Set timeout
-            Task {
+            timeoutTask = Task {
                 try? await Task.sleep(for: self.timeout)
                 resumeOnce(with: .failure(TVError.timeout))
             }

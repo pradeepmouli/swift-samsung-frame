@@ -16,6 +16,9 @@ public actor D2DSocketClient {
     private var connection: NWConnection?
     private let timeout: Duration = .seconds(30)
     
+    /// Public initializer for D2DSocketClient
+    public init() {}
+    
     /// Helper to generate random connection ID
     public static func generateConnectionID() -> Int {
         Int.random(in: 0..<min(4 * 1024 * 1024 * 1024, Int.max))

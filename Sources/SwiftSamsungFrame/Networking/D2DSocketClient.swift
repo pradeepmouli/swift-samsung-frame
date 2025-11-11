@@ -256,6 +256,7 @@ public actor D2DSocketClient {
 #else
 // Stub implementation for platforms without Network framework
 public actor D2DSocketClient {
+    public init() {}
     public static func generateConnectionID() -> Int {
         Int.random(in: 0..<min(4 * 1024 * 1024 * 1024, Int.max))
     }

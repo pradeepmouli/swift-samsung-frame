@@ -1,17 +1,29 @@
 # SwiftSamsungFrame
 
-A Swift 6 library package for building modern Swift applications.
+A Swift 6 library for controlling Samsung TVs (2016+), providing remote control, application management, and Art Mode features for Frame TVs.
 
 ## Features
 
-- Swift 6 with strict concurrency enabled
-- Cross-platform support (macOS, iOS, tvOS, watchOS)
-- Swift Package Manager integration
+- ✅ Swift 6 with strict concurrency enabled
+- ✅ Cross-platform support (macOS, iOS, tvOS, watchOS, Linux)
+- ✅ Swift Package Manager integration
+- ✅ WebSocket-based real-time communication
+- ✅ REST API for device management
+- ✅ Actor-based thread-safe connection management
+- ✅ Keychain-based secure token storage
+- ✅ Remote control commands (MVP implemented)
+- ✅ Application management (WebSocket + REST API)
+- ✅ Art Mode for Frame TVs (WebSocket-based, D2D transfer structure)
+- ✅ Network device discovery (manual lookup implemented)
+- 🚧 Full D2D socket implementation (requires platform-specific code)
+- 🚧 mDNS/SSDP discovery (stub implementation)
+- 🚧 Advanced connection features (health checks, auto-reconnect)
 
 ## Requirements
 
 - Swift 6.2 or later
-- macOS 13+, iOS 16+, tvOS 16+, or watchOS 9+
+- macOS 15+, iOS 18+, tvOS 18+, or watchOS 11+
+- Samsung TV (2016+ models with Tizen OS)
 
 ## Installation
 
@@ -19,17 +31,338 @@ Add SwiftSamsungFrame to your `Package.swift` dependencies:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/yourusername/swift-samsung-frame.git", from: "1.0.0")
+    .package(url: "https://github.com/yourusername/swift-samsung-frame.git", from: "0.1.0")
 ]
 ```
 
 ## Usage
 
+### Basic Connection and Remote Control
+
 ```swift
 import SwiftSamsungFrame
 
-// Add your usage examples here
+// Create client instance
+let client = TVClient()
+
+// Connect to TV
+do {
+    try await client.connect(to: "192.168.1.100")
+    print("Connected to TV")
+    
+    // Get device information
+    let device = try await client.deviceInfo()
+    print("Connected to: \(device.name)")
+    
+    // Send remote control commands
+    try await client.remote.power()
+    try await client.remote.volumeUp(steps: 5)
+    try await client.remote.navigate(.down)
+    try await client.remote.enter()
+    
+    // Disconnect when done
+    await client.disconnect()
+} catch {
+    print("Error: \(error.localizedDescription)")
+}
 ```
+
+### With Token Persistence
+
+```swift
+// Use Keychain for storing auth tokens
+let storage = KeychainTokenStorage()
+let client = TVClient()
+
+try await client.connect(
+    to: "192.168.1.100",
+    tokenStorage: storage
+)
+
+// Token will be automatically saved and reused on reconnection
+```
+
+### Remote Control Commands
+
+```swift
+// Basic commands
+try await client.remote.power()
+try await client.remote.volumeUp()
+try await client.remote.volumeDown()
+try await client.remote.mute()
+
+// Navigation
+try await client.remote.navigate(.up)
+try await client.remote.navigate(.down)
+try await client.remote.navigate(.left)
+try await client.remote.navigate(.right)
+try await client.remote.enter()
+try await client.remote.back()
+try await client.remote.home()
+
+// Send multiple keys in sequence
+try await client.remote.sendKeys([.down, .down, .enter], delay: .milliseconds(200))
+```
+
+### Application Management
+
+```swift
+// Launch an app
+try await client.apps.launch("111299001912") // YouTube app ID
+
+// Get app status
+let status = try await client.apps.status(of: "111299001912")
+print("App is \(status)")
+
+// Close an app
+try await client.apps.close("111299001912")
+
+// List installed apps (sends request via WebSocket)
+let apps = try await client.apps.list()
+
+// Install an app from store
+try await client.apps.install("appIdFromStore")
+```
+
+### Art Mode (Frame TVs)
+
+```swift
+// Check if Art Mode is supported
+let isSupported = try await client.art.isSupported()
+
+// Select an art piece
+try await client.art.select("contentId", show: true)
+
+// Enable/disable Art Mode
+try await client.art.setArtMode(enabled: true)
+
+// Delete art pieces
+try await client.art.delete("contentId")
+try await client.art.deleteMultiple(["id1", "id2"])
+
+// Apply photo filters
+try await client.art.applyFilter(.watercolor, to: "contentId")
+
+// Get available filters
+let filters = try await client.art.availableFilters()
+```
+
+### Device Discovery
+
+**Note**: Device discovery requires Network framework (available on iOS, iPadOS, macOS, tvOS)
+
+```swift
+// Manual lookup of a known TV (works on all platforms)
+let discovery = DiscoveryService()
+let result = try await discovery.find(at: "192.168.1.100")
+print("Found: \(result.device.name)")
+
+// Automatic discovery on local network (iOS/iPadOS/macOS/tvOS only)
+#if canImport(Network)
+for await result in discovery.discover(timeout: .seconds(5)) {
+    print("Discovered: \(result.device.name) at \(result.device.host)")
+}
+#endif
+```
+
+### Platform-Specific Examples
+
+#### iOS/iPadOS: Using with SwiftUI
+
+```swift
+import SwiftUI
+import SwiftSamsungFrame
+
+@MainActor
+class TVRemoteViewModel: ObservableObject {
+    @Published var connectionState: ConnectionState = .disconnected
+    @Published var errorMessage: String?
+    
+    private let client = TVClient()
+    private let storage = KeychainTokenStorage()
+    
+    func connect(to host: String) async {
+        do {
+            connectionState = .connecting
+            _ = try await client.connect(to: host, tokenStorage: storage)
+            connectionState = .connected
+        } catch {
+            errorMessage = error.localizedDescription
+            connectionState = .error
+        }
+    }
+    
+    func sendCommand(_ action: @escaping (TVClient) async throws -> Void) async {
+        do {
+            try await action(client)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
+struct RemoteControlView: View {
+    @StateObject private var viewModel = TVRemoteViewModel()
+    
+    var body: some View {
+        VStack {
+            Button("Power") {
+                Task {
+                    await viewModel.sendCommand { client in
+                        try await client.remote.power()
+                    }
+                }
+            }
+            
+            Button("Volume Up") {
+                Task {
+                    await viewModel.sendCommand { client in
+                        try await client.remote.volumeUp()
+                    }
+                }
+            }
+        }
+        .task {
+            await viewModel.connect(to: "192.168.1.100")
+        }
+    }
+}
+```
+
+#### macOS: Command Line Tool
+
+```swift
+import Foundation
+import SwiftSamsungFrame
+
+@main
+struct TVControlTool {
+    static func main() async throws {
+        let client = TVClient()
+        let storage = KeychainTokenStorage()
+        
+        print("Connecting to TV...")
+        _ = try await client.connect(to: "192.168.1.100", tokenStorage: storage)
+        
+        print("Connected! Sending commands...")
+        try await client.remote.power()
+        
+        print("Done!")
+        await client.disconnect()
+    }
+}
+```
+
+#### tvOS: Remote Control App
+
+```swift
+import SwiftUI
+import SwiftSamsungFrame
+
+// tvOS app for controlling another Samsung TV
+@MainActor
+class TVControllerViewModel: ObservableObject {
+    private let client = TVClient()
+    
+    func sendKey(_ key: KeyCode) async {
+        do {
+            try await client.remote.sendKey(key)
+        } catch {
+            print("Error sending key: \(error)")
+        }
+    }
+}
+```
+
+## Architecture
+
+The library is organized into modular components:
+
+- **Models**: Core data structures (TVDevice, TVApp, ArtPiece, etc.)
+- **Protocols**: Protocol-oriented interfaces for all major components
+- **Client**: Main TVClient and connection management
+- **Networking**: WebSocket and REST API clients
+- **Commands**: Remote control command implementations
+- **Extensions**: Utility extensions (Logger, Duration)
+
+All components follow Swift 6 strict concurrency requirements using actors and Sendable types.
+
+## Platform Support
+
+### Supported Platforms
+
+- **iOS 18+** ✅ Full support (MVP platform)
+- **iPadOS 18+** ✅ Full support (MVP platform)
+- **macOS 15+** ✅ Full support
+- **tvOS 18+** ✅ Full support
+- **watchOS 11+** ⚠️ Limited support (see below)
+
+### Platform-Specific Features
+
+#### Network Discovery (mDNS/SSDP)
+- **Available on**: iOS, iPadOS, macOS, tvOS
+- Uses Apple's Network framework for service discovery
+- Supports both mDNS (Bonjour) and SSDP protocols
+- **Not available on**: Linux and other non-Apple platforms
+
+#### Keychain Token Storage
+- **Available on**: iOS, iPadOS, macOS, tvOS, watchOS
+- Secure storage using system Keychain
+- Supports Keychain access groups for sharing between apps
+- **Not available on**: Linux and other non-Apple platforms
+
+#### D2D Socket Client (Art Uploads)
+- **Available on**: iOS, iPadOS, macOS, tvOS
+- Uses Network framework for direct TCP socket connections
+- Enables art image upload/download for Frame TVs
+- **Not available on**: watchOS (memory constraints), Linux
+
+### watchOS Limitations
+
+Due to memory constraints and limited networking capabilities on watchOS:
+
+- ✅ Basic remote control commands
+- ✅ Connection management
+- ✅ Token storage via Keychain
+- ❌ Art image upload (disabled)
+- ❌ Large data transfers
+- ⚠️ Limited discovery capabilities
+
+### Linux Support
+
+For Linux platform (experimental):
+- ✅ Basic data models and protocols
+- ✅ Core TVClient functionality (with FoundationNetworking)
+- ❌ Keychain storage (use custom TokenStorageProtocol implementation)
+- ❌ Network discovery
+- ❌ D2D socket transfers
+
+## Development Status
+
+**Current Version**: 0.2.0-alpha
+
+### Completed
+- ✅ Core data models and protocols
+- ✅ WebSocket client with TLS support
+- ✅ REST API client
+- ✅ TVClient with connection management
+- ✅ Remote control commands (full implementation)
+- ✅ Keychain token storage (Apple platforms)
+- ✅ Application management (WebSocket + REST)
+- ✅ Art Mode WebSocket protocol implementation
+- ✅ Device discovery (manual lookup)
+- ✅ D2D socket implementation (Apple platforms with Network framework)
+- ✅ mDNS/SSDP network discovery (Apple platforms)
+
+### In Progress
+- 🚧 WebSocket response parsing for art and app lists
+- 🚧 Complete art upload flow integration
+
+### Planned
+- 📋 Advanced connection features (health checks, auto-reconnect)
+- 📋 Complete documentation
+- 📋 Example applications
+- 📋 Comprehensive integration tests
 
 ## Development
 
@@ -45,6 +378,17 @@ swift build
 swift test
 ```
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
+
 ## License
 
-Add your license information here.
+[Add your license information here]
+
+## References
+
+- [Samsung TV WebSocket API Documentation](https://github.com/xchwarze/samsung-tv-ws-api)
+- [Samsung TV Art Updates Branch](https://github.com/xchwarze/samsung-tv-ws-api/tree/art-updates) - Reference for Art Mode implementation
+- [Samsung Smart TV Remote Control Protocol](https://github.com/Ape/samsungctl)
+

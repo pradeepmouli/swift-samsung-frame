@@ -20,3 +20,10 @@
 Work through each checklist item systematically.
 Keep communication concise and focused.
 Follow development best practices.
+
+## Active Technologies
+- Swift 6.2+ (strict concurrency enabled) + Foundation (URLSession, URLSessionWebSocketTask, Network framework for discovery), Security framework (Keychain) (001-samsung-tv-client)
+- Keychain for auth tokens, UserDefaults for preferences (001-samsung-tv-client)
+
+## Recent Changes
+- 001-samsung-tv-client: Added Swift 6.2+ (strict concurrency enabled) + Foundation (URLSession, URLSessionWebSocketTask, Network framework for discovery), Security framework (Keychain)

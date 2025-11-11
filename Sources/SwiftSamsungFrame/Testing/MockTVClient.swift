@@ -144,6 +144,26 @@ public actor MockTVClient: TVClientProtocol {
     
     // MARK: - Test Helpers
     
+    /// Configure connection state for testing
+    public func configure(state: ConnectionState) {
+        connectionStateToReturn = state
+    }
+    
+    /// Configure device info for testing
+    public func configure(device: TVDevice) {
+        deviceInfoToReturn = device
+    }
+    
+    /// Configure connect error for testing
+    public func configure(connectError error: (any Error)?) {
+        connectError = error
+    }
+    
+    /// Configure session for testing
+    public func configure(session: ConnectionSession) {
+        sessionToReturn = session
+    }
+    
     /// Reset all call counters and captured values
     public func reset() {
         connectCallCount = 0

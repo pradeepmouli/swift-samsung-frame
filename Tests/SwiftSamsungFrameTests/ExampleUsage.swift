@@ -350,9 +350,9 @@ func exampleMockUsage() async throws {
     let mockRemote = MockRemoteControl()
     let mock = MockTVClient(remote: mockRemote)
     
-    // Configure mock behavior
-    await mock.setConnectionState(.connected)
-    await mock.setDeviceInfo(TVDevice(
+    // Configure mock behavior using actor-safe methods
+    await mock.configure(state: .connected)
+    await mock.configure(device: TVDevice(
         id: "test-tv",
         host: "192.168.1.100",
         port: 8001,
@@ -377,20 +377,6 @@ func exampleMockUsage() async throws {
     
     // Reset mock for next test
     await mock.reset()
-}
-
-// MARK: - Helper Extensions for Mock
-
-extension MockTVClient {
-    /// Helper to set connection state
-    func setConnectionState(_ state: ConnectionState) {
-        connectionStateToReturn = state
-    }
-    
-    /// Helper to set device info
-    func setDeviceInfo(_ device: TVDevice) {
-        deviceInfoToReturn = device
-    }
 }
 
 // MARK: - Running Examples

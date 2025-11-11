@@ -24,17 +24,18 @@ public actor D2DSocketClient {
         Int.random(in: 0..<min(4 * 1024 * 1024 * 1024, Int.max))
     }
     
-    /// Send data over D2D socket connection
+    /// Establish a TCP connection to the specified host and port
     /// - Parameters:
     ///   - host: Host IP address
     ///   - port: Port number
-    ///   - data: Data to send
-    /// - Throws: TVError if transfer fails
-    public func send(to host: String, port: Int, data: Data) async throws {
-        #if canImport(OSLog)
-        Logger.networking.info("D2D: Sending \(data.count) bytes to \(host):\(port)")
-        #endif
-        
+    ///   - queueLabel: Label for the dispatch queue
+    /// - Returns: Connected NWConnection
+    /// - Throws: TVError if connection fails
+    private func establishConnection(
+        to host: String,
+        port: Int,
+        queueLabel: String
+    ) async throws -> NWConnection {
         // Create connection
         let endpoint = NWEndpoint.hostPort(
             host: NWEndpoint.Host(host),
@@ -92,7 +93,7 @@ public actor D2DSocketClient {
                 }
             }
             
-            let queue = DispatchQueue(label: "com.swiftsamsungframe.d2d.send")
+            let queue = DispatchQueue(label: queueLabel)
             conn.start(queue: queue)
             
             // Set timeout
@@ -101,6 +102,27 @@ public actor D2DSocketClient {
                 resumeOnce(with: .failure(TVError.timeout))
             }
         }
+        
+        return conn
+    }
+    
+    /// Send data over D2D socket connection
+    /// - Parameters:
+    ///   - host: Host IP address
+    ///   - port: Port number
+    ///   - data: Data to send
+    /// - Throws: TVError if transfer fails
+    public func send(to host: String, port: Int, data: Data) async throws {
+        #if canImport(OSLog)
+        Logger.networking.info("D2D: Sending \(data.count) bytes to \(host):\(port)")
+        #endif
+        
+        // Establish connection
+        let conn = try await establishConnection(
+            to: host,
+            port: port,
+            queueLabel: "com.swiftsamsungframe.d2d.send"
+        )
         
         // Send data
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
@@ -136,72 +158,12 @@ public actor D2DSocketClient {
         Logger.networking.info("D2D: Receiving up to \(expectedLength) bytes from \(host):\(port)")
         #endif
         
-        // Create connection
-        let endpoint = NWEndpoint.hostPort(
-            host: NWEndpoint.Host(host),
-            port: NWEndpoint.Port(integerLiteral: UInt16(port))
+        // Establish connection
+        let conn = try await establishConnection(
+            to: host,
+            port: port,
+            queueLabel: "com.swiftsamsungframe.d2d.receive"
         )
-        
-        let parameters = NWParameters.tcp
-        parameters.allowLocalEndpointReuse = true
-        
-        let conn = NWConnection(to: endpoint, using: parameters)
-        self.connection = conn
-        
-        // Start connection
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            var isResumed = false
-            // NSLock is used here because stateUpdateHandler is called on a different queue
-            // (the DispatchQueue created below), while the timeout Task runs on the actor's executor.
-            // This prevents race conditions when both try to resume the continuation.
-            let resumeLock = NSLock()
-            var timeoutTask: Task<Void, Never>?
-            
-            func resumeOnce(with result: Result<Void, Error>) {
-                resumeLock.lock()
-                defer { resumeLock.unlock() }
-                if !isResumed {
-                    isResumed = true
-                    timeoutTask?.cancel()
-                    conn.stateUpdateHandler = nil
-                    continuation.resume(with: result)
-                }
-            }
-            
-            conn.stateUpdateHandler = { state in
-                switch state {
-                case .ready:
-                    #if canImport(OSLog)
-                    Logger.networking.debug("D2D: Connection ready for receive")
-                    #endif
-                    resumeOnce(with: .success(()))
-                    
-                case .failed(let error):
-                    #if canImport(OSLog)
-                    Logger.networking.error("D2D: Connection failed: \(error.localizedDescription)")
-                    #endif
-                    resumeOnce(with: .failure(TVError.connectionFailed(reason: error.localizedDescription)))
-                    
-                case .cancelled:
-                    #if canImport(OSLog)
-                    Logger.networking.debug("D2D: Connection cancelled")
-                    #endif
-                    resumeOnce(with: .failure(TVError.connectionFailed(reason: "Connection cancelled")))
-                    
-                default:
-                    break
-                }
-            }
-            
-            let queue = DispatchQueue(label: "com.swiftsamsungframe.d2d.receive")
-            conn.start(queue: queue)
-            
-            // Set timeout
-            timeoutTask = Task {
-                try? await Task.sleep(for: self.timeout)
-                resumeOnce(with: .failure(TVError.timeout))
-            }
-        }
         
         // Receive data
         let receivedData = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Data, Error>) in

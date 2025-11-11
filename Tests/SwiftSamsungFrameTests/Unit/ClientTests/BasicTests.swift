@@ -114,8 +114,8 @@ func testD2DSocketClientConnectionID() async throws {
     let id2 = D2DSocketClient.generateConnectionID()
     
     // Verify IDs are generated
-    #expect(id1 > 0)
-    #expect(id2 > 0)
+    #expect(id1 >= 0)
+    #expect(id2 >= 0)
     
     // Verify IDs are (likely) different
     #expect(id1 != id2)

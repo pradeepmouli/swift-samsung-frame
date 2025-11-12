@@ -32,7 +32,7 @@ public enum NavigationDirection: Sendable, Codable, CustomStringConvertible {
         case .right: return "right"
         }
     }
-    
+
     /// Maps navigation direction to the corresponding remote control key code
     /// - Returns: KeyCode for the directional button
     public var keyCode: KeyCode {

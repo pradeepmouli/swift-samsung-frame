@@ -36,19 +36,19 @@ public final class RESTClient: @unchecked Sendable {
     private let session: URLSession
     private let observerLock = NSLock()
     private var observers: [UUID: LogObserver] = [:]
-    
+
     /// Base endpoint for REST interactions
     public var serviceBaseURL: URL { baseURL }
-    
+
     /// Initialize REST client
     /// - Parameter baseURL: Base URL for REST API (http://host:8001)
     public init(baseURL: URL) {
         self.baseURL = baseURL
-        
+
         let configuration = URLSessionConfiguration.default
         configuration.timeoutIntervalForRequest = 10
         configuration.timeoutIntervalForResource = 60
-        
+
         self.session = URLSession(configuration: configuration)
     }
 
@@ -68,7 +68,7 @@ public final class RESTClient: @unchecked Sendable {
         observers.removeValue(forKey: id)
         observerLock.unlock()
     }
-    
+
     /// Get device information
     /// - Returns: Device info JSON data
     /// - Throws: TVError if request fails
@@ -76,7 +76,7 @@ public final class RESTClient: @unchecked Sendable {
         let url = baseURL.appendingPathComponent("/api/v2/")
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
-        
+
         return try await perform(request) { response, _ in
             TVError.commandFailed(
                 code: response.statusCode,
@@ -84,7 +84,7 @@ public final class RESTClient: @unchecked Sendable {
             )
         }
     }
-    
+
     /// Upload image for art mode
     /// - Parameters:
     ///   - imageData: Image data to upload
@@ -102,42 +102,42 @@ public final class RESTClient: @unchecked Sendable {
         throw TVError.uploadFailed(reason: "Art upload is not supported on watchOS")
         #else
         let url = baseURL.appendingPathComponent("/api/v2/art/ms/content/upload")
-        
+
         let boundary = "Boundary-\(UUID().uuidString)"
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-        
+
         var body = Data()
 
         // Choose MIME type based on file name extension, default to JPEG
         let lowercased = fileName.lowercased()
         let mimeType: String = lowercased.hasSuffix(".png") ? "image/png" : "image/jpeg"
-        
+
         // Add image file
         body.append("--\(boundary)\r\n".data(using: .utf8)!)
         body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(fileName)\"\r\n".data(using: .utf8)!)
         body.append("Content-Type: \(mimeType)\r\n\r\n".data(using: .utf8)!)
         body.append(imageData)
         body.append("\r\n".data(using: .utf8)!)
-        
+
         // Add matte if specified
         if let matte {
             body.append("--\(boundary)\r\n".data(using: .utf8)!)
             body.append("Content-Disposition: form-data; name=\"matte\"\r\n\r\n".data(using: .utf8)!)
             body.append("\(matte.rawValue)\r\n".data(using: .utf8)!)
         }
-        
+
         body.append("--\(boundary)--\r\n".data(using: .utf8)!)
-        
+
         request.httpBody = body
-        
+
         return try await perform(request) { response, _ in
             TVError.uploadFailed(reason: "HTTP \(response.statusCode)")
         }
         #endif
     }
-    
+
     /// Get art thumbnail
     /// - Parameter artID: Art piece identifier
     /// - Returns: Thumbnail image data
@@ -146,7 +146,7 @@ public final class RESTClient: @unchecked Sendable {
         let url = baseURL.appendingPathComponent("/api/v2/art/ms/content/\(artID)/thumbnail")
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
-        
+
         return try await perform(request) { response, _ in
             TVError.commandFailed(
                 code: response.statusCode,
@@ -154,7 +154,7 @@ public final class RESTClient: @unchecked Sendable {
             )
         }
     }
-    
+
     /// Delete art piece
     /// - Parameter artID: Art piece identifier
     /// - Throws: TVError if request fails
@@ -162,7 +162,7 @@ public final class RESTClient: @unchecked Sendable {
         let url = baseURL.appendingPathComponent("/api/v2/art/ms/content/\(artID)")
         var request = URLRequest(url: url)
         request.httpMethod = "DELETE"
-        
+
         _ = try await perform(request) { response, _ in
             TVError.commandFailed(
                 code: response.statusCode,
@@ -170,7 +170,7 @@ public final class RESTClient: @unchecked Sendable {
             )
         }
     }
-    
+
     /// Get app icon
     /// - Parameter appID: App identifier
     /// - Returns: Icon image data
@@ -179,7 +179,7 @@ public final class RESTClient: @unchecked Sendable {
         let url = baseURL.appendingPathComponent("/api/v2/applications/\(appID)/icon")
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
-        
+
         return try await perform(request) { response, _ in
             TVError.commandFailed(
                 code: response.statusCode,
@@ -187,7 +187,7 @@ public final class RESTClient: @unchecked Sendable {
             )
         }
     }
-    
+
     /// Get app status
     /// - Parameter appID: App identifier
     /// - Returns: App status data
@@ -196,7 +196,7 @@ public final class RESTClient: @unchecked Sendable {
         let url = baseURL.appendingPathComponent("/api/v2/applications/\(appID)")
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
-        
+
         return try await perform(request) { response, _ in
             TVError.commandFailed(
                 code: response.statusCode,
@@ -204,7 +204,7 @@ public final class RESTClient: @unchecked Sendable {
             )
         }
     }
-    
+
     /// Launch app via REST API
     /// - Parameter appID: App identifier
     /// - Throws: TVError if request fails
@@ -212,7 +212,7 @@ public final class RESTClient: @unchecked Sendable {
         let url = baseURL.appendingPathComponent("/api/v2/applications/\(appID)")
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        
+
         _ = try await perform(request) { response, _ in
             TVError.commandFailed(
                 code: response.statusCode,
@@ -220,7 +220,7 @@ public final class RESTClient: @unchecked Sendable {
             )
         }
     }
-    
+
     /// Close app via REST API
     /// - Parameter appID: App identifier
     /// - Throws: TVError if request fails
@@ -228,7 +228,7 @@ public final class RESTClient: @unchecked Sendable {
         let url = baseURL.appendingPathComponent("/api/v2/applications/\(appID)")
         var request = URLRequest(url: url)
         request.httpMethod = "DELETE"
-        
+
         _ = try await perform(request) { response, _ in
             TVError.commandFailed(
                 code: response.statusCode,
@@ -236,7 +236,7 @@ public final class RESTClient: @unchecked Sendable {
             )
         }
     }
-    
+
     /// Install app via REST API
     /// - Parameter appID: App identifier
     /// - Throws: TVError if request fails
@@ -244,7 +244,7 @@ public final class RESTClient: @unchecked Sendable {
         let url = baseURL.appendingPathComponent("/api/v2/applications/\(appID)")
         var request = URLRequest(url: url)
         request.httpMethod = "PUT"
-        
+
         _ = try await perform(request) { response, _ in
             TVError.commandFailed(
                 code: response.statusCode,

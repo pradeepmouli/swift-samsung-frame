@@ -13,28 +13,28 @@ import Foundation
 public actor ConnectionSession: Identifiable {
     /// Unique session identifier
     public let id: UUID
-    
+
     /// Connected device
     public let device: TVDevice
-    
+
     /// Current state (disconnected, connecting, connected, error)
     public private(set) var state: ConnectionState
-    
+
     /// Authentication token for reconnection
     public private(set) var authToken: String?
-    
+
     /// Active WebSocket abstraction (nil when disconnected)
     public private(set) var webSocketClient: WebSocketClient?
-    
+
     /// Connection establishment time
     public private(set) var connectedAt: Date?
-    
+
     /// Last communication timestamp
     public private(set) var lastActivity: Date
-    
+
     /// Ping interval (default: 30s)
     public let healthCheckInterval: TimeInterval
-    
+
     /// Initialize a new connection session
     /// - Parameters:
     ///   - device: TV device to connect to
@@ -49,7 +49,7 @@ public actor ConnectionSession: Identifiable {
         self.lastActivity = Date()
         self.healthCheckInterval = healthCheckInterval
     }
-    
+
     /// Update connection state
     /// - Parameter newState: New connection state
     public func updateState(_ newState: ConnectionState) {
@@ -58,24 +58,24 @@ public actor ConnectionSession: Identifiable {
             connectedAt = Date()
         }
     }
-    
+
     /// Set authentication token
     /// - Parameter token: Authentication token string
     public func setAuthToken(_ token: String) {
         authToken = token
     }
-    
+
     /// Associate an active WebSocketClient with this session
     /// - Parameter client: Connected WebSocketClient instance
     public func setWebSocket(_ client: WebSocketClient) {
         webSocketClient = client
     }
-    
+
     /// Update last activity timestamp
     public func updateActivity() {
         lastActivity = Date()
     }
-    
+
     /// Clear WebSocket connection
     public func clearWebSocket() {
         webSocketClient = nil

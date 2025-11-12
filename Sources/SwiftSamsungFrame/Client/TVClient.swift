@@ -10,15 +10,15 @@ import OSLog
 private actor HandshakeState {
     private var connectReceived = false
     private var readyReceived = false
-    
+
     var isComplete: Bool {
         connectReceived && readyReceived
     }
-    
+
     func markConnectReceived() {
         connectReceived = true
     }
-    
+
     func markReadyReceived() {
         readyReceived = true
     }
@@ -31,20 +31,20 @@ public actor TVClient: TVClientProtocol {
     private var restClient: RESTClient?
     private var tokenStorage: (any TokenStorageProtocol)?
     private var delegate: (any TVClientDelegate)?
-    
+
     private let _remote: RemoteControl
     private let _apps: AppManagement
     private let _art: ArtController
-    
+
     /// Remote control interface
     public nonisolated var remote: any RemoteControlProtocol { _remote }
-    
+
     /// App management interface
     public nonisolated var apps: any AppManagementProtocol { _apps }
-    
-    /// Art mode interface  
+
+    /// Art mode interface
     public nonisolated var art: any ArtControllerProtocol { _art }
-    
+
     /// Initialize TV client
     /// - Parameter delegate: Optional delegate for state changes
     public init(delegate: (any TVClientDelegate)? = nil) {
@@ -53,7 +53,7 @@ public actor TVClient: TVClientProtocol {
         self._apps = AppManagement()
         self._art = ArtController()
     }
-    
+
     public func connect(
         to host: String,
         port: Int = 8001,
@@ -61,7 +61,7 @@ public actor TVClient: TVClientProtocol {
         channel: WebSocketChannel = .remoteControl
     ) async throws -> ConnectionSession {
         self.tokenStorage = tokenStorage
-        
+
         let device = TVDevice(
             id: host,
             host: host,
@@ -69,19 +69,19 @@ public actor TVClient: TVClientProtocol {
             name: "Samsung TV",
             apiVersion: .v2
         )
-        
+
         #if canImport(OSLog)
         Logger.connection.info("Connecting to TV at \(host):\(port)")
         #endif
-        
+
         // Create connection session
         let newSession = ConnectionSession(device: device)
         self.session = newSession
-        
+
         // Update state to connecting
         await newSession.updateState(.connecting)
         await notifyStateChange(.connecting)
-        
+
         let clientName = "SamsungTvArt"  // Match JavaScript client name
         let encodedClientName = Data(clientName.utf8).base64EncodedString()
 
@@ -116,10 +116,10 @@ public actor TVClient: TVClientProtocol {
         // Initialize clients
         let wsClient = WebSocketClient()
         self.webSocketClient = wsClient
-        
+
         let restURL = URL(string: "http://\(host):8001")!
         self.restClient = RESTClient(baseURL: restURL)
-        
+
         do {
             // Connect WebSocket (no subprotocols - Samsung TVs work without them)
             do {
@@ -141,16 +141,16 @@ public actor TVClient: TVClientProtocol {
                     throw error
                 }
             }
-            
+
             // Wait for server-driven handshake (TV will send ms.channel.connect and ms.channel.ready)
             await newSession.updateState(.authenticating)
             await notifyStateChange(.authenticating)
-            
+
             print("[TVClient] Waiting for handshake events (connect + ready)...")
-            
+
             // Set up handshake state tracker
             let handshakeState = HandshakeState()
-            
+
             // Set up message handler to listen for ms.channel.connect and persist tokens
             let handlerID = await wsClient.addMessageHandler { data in
                 guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -164,7 +164,7 @@ public actor TVClient: TVClientProtocol {
                     #endif
                     return
                 }
-                
+
                 print("[TVClient] Handshake: received event '\(event)'")
                 if let dataField = json["data"] {
                     print("[TVClient] Event data: \(dataField)")
@@ -172,7 +172,7 @@ public actor TVClient: TVClientProtocol {
                 #if canImport(OSLog)
                 Logger.connection.debug("Handshake: received event '\(event)'")
                 #endif
-                
+
                 Task {
                     if event == "ms.channel.connect" {
                         print("[TVClient] ✓ Marking connect received")
@@ -185,94 +185,94 @@ public actor TVClient: TVClientProtocol {
                     }
                 }
             }
-            
+
             // Also handle token persistence
             let tokenHandlerID = await wsClient.addMessageHandler { [weak self] data in
                 Task { [weak self] in
                     await self?.handleConnectionMessage(data, deviceID: device.id)
                 }
             }
-            
+
             // Wait for both ms.channel.connect and ms.channel.ready events
             print("[TVClient] ⏳ Waiting for TV authorization...")
             print("[TVClient] � Please check your TV screen and APPROVE the connection request!")
             print("[TVClient] (Waiting up to 90 seconds for both connect and ready events...)")
-            
+
             let startTime = Date()
             let timeout: TimeInterval = 90.0  // Give time for both approval and events
             while !(await handshakeState.isComplete) && Date().timeIntervalSince(startTime) < timeout {
                 try await Task.sleep(for: .milliseconds(500))
             }
-            
+
             let elapsed = Date().timeIntervalSince(startTime)
             print("[TVClient] Handshake wait completed after \(String(format: "%.2f", elapsed))s")
-            
+
             guard await handshakeState.isComplete else {
                 print("[TVClient] ❌ Handshake failed - did not receive both events")
                 await wsClient.removeMessageHandler(handlerID)
                 await wsClient.removeMessageHandler(tokenHandlerID)
                 throw TVError.connectionFailed(reason: "Did not receive connection handshake from TV")
             }
-            
+
             print("[TVClient] ✓ Handshake complete!")
             #if canImport(OSLog)
             Logger.connection.info("Received handshake events from TV (connect + ready)")
             #endif
-            
+
             // Remove the connection message handlers after handshake completes
             await wsClient.removeMessageHandler(handlerID)
             await wsClient.removeMessageHandler(tokenHandlerID)
-            
+
             await newSession.updateState(.connected)
             await newSession.setWebSocket(wsClient)
             await notifyStateChange(.connected)
-            
+
             #if canImport(OSLog)
             Logger.connection.info("Connected successfully")
             #endif
-            
+
             // Inject websocket into controllers
             await _remote.setWebSocket(wsClient)
             await _apps.setWebSocket(wsClient)
             await _apps.setRESTClient(restClient)
             await _art.setWebSocket(wsClient)
             await _art.setRESTClient(restClient)
-            
+
             return newSession
         } catch {
             await newSession.updateState(.error)
             await notifyStateChange(.error)
-            
+
             #if canImport(OSLog)
             Logger.connection.error("Connection failed: \(error.localizedDescription)")
             #endif
-            
+
             throw TVError.connectionFailed(reason: error.localizedDescription)
         }
     }
-    
+
     public func disconnect() async {
         guard let session else { return }
-        
+
         #if canImport(OSLog)
         Logger.connection.info("Disconnecting from TV")
         #endif
-        
+
         await session.updateState(.disconnecting)
         await notifyStateChange(.disconnecting)
-        
+
         await webSocketClient?.disconnect()
     await _art.clearWebSocket()
     await session.clearWebSocket()
-        
+
         await session.updateState(.disconnected)
         await notifyStateChange(.disconnected)
-        
+
         self.session = nil
         self.webSocketClient = nil
         self.restClient = nil
     }
-    
+
     public func addRESTObserver(_ observer: @escaping RESTClient.LogObserver) async -> UUID? {
         guard let restClient else { return nil }
         return restClient.addObserver(observer)
@@ -287,17 +287,17 @@ public actor TVClient: TVClientProtocol {
             await session?.state ?? .disconnected
         }
     }
-    
+
     public func deviceInfo() async throws -> TVDevice {
         guard let session else {
             throw TVError.connectionFailed(reason: "Not connected")
         }
-        
+
         return session.device
     }
-    
+
     // MARK: - Private Methods
-    
+
     private func notifyStateChange(_ state: ConnectionState) async {
         await delegate?.client(self, didChangeState: state)
     }
@@ -308,18 +308,18 @@ public actor TVClient: TVClientProtocol {
               let event = json["event"] as? String else {
             return
         }
-        
+
         // Listen for ms.channel.connect event which may contain a new token
         if event == "ms.channel.connect",
            let dataDict = json["data"] as? [String: Any],
            let token = dataDict["token"] as? String,
            !token.isEmpty,
            let storage = tokenStorage {
-            
+
             #if canImport(OSLog)
             Logger.connection.info("Received new token from TV, persisting to storage")
             #endif
-            
+
             let authToken = AuthenticationToken(
                 value: token,
                 deviceID: deviceID
@@ -361,23 +361,23 @@ actor RemoteControl: RemoteControlProtocol {
     private var webSocket: WebSocketClient?
     private let commandTimeout: Duration = .seconds(5)
     private let retryDelay: Duration = .milliseconds(500)
-    
+
     func setWebSocket(_ ws: WebSocketClient) {
         self.webSocket = ws
     }
-    
+
     public func sendKey(_ key: KeyCode) async throws {
         guard let webSocket else {
             throw TVError.connectionFailed(reason: "Not connected")
         }
-        
+
         #if canImport(OSLog)
         Logger.commands.debug("Sending key: \(key.rawValue)")
         #endif
-        
+
         let message = WebSocketMessage.remoteControl(key: key.rawValue)
         let data = try JSONEncoder().encode(message)
-        
+
         // Try with timeout and retry once on failure
         do {
             try await withTimeout(commandTimeout) {
@@ -387,10 +387,10 @@ actor RemoteControl: RemoteControlProtocol {
             #if canImport(OSLog)
             Logger.commands.warning("Command timed out: \(key.rawValue), retrying...")
             #endif
-            
+
             // Retry once after delay
             try await Task.sleep(for: retryDelay)
-            
+
             do {
                 try await withTimeout(commandTimeout) {
                     try await webSocket.send(data)
@@ -403,98 +403,98 @@ actor RemoteControl: RemoteControlProtocol {
         } catch {
             throw TVError.commandFailed(code: -1, message: error.localizedDescription)
         }
-        
+
         #if canImport(OSLog)
         Logger.commands.debug("Key sent successfully: \(key.rawValue)")
         #endif
     }
-    
+
     public func sendKeys(_ keys: [KeyCode], delay: Duration = .milliseconds(100)) async throws {
         #if canImport(OSLog)
         Logger.commands.info("Sending \(keys.count) keys with delay")
         #endif
-        
+
         for (index, key) in keys.enumerated() {
             try await sendKey(key)
-            
+
             // Don't delay after the last key
             if index < keys.count - 1 {
                 try await Task.sleep(for: delay)
             }
         }
     }
-    
+
     public func power() async throws {
         #if canImport(OSLog)
         Logger.commands.info("Toggling power")
         #endif
-        
+
         try await sendKey(.power)
     }
-    
+
     public func volumeUp(steps: Int = 1) async throws {
         guard steps > 0 else { return }
-        
+
         #if canImport(OSLog)
         Logger.commands.info("Increasing volume by \(steps) steps")
         #endif
-        
+
         for _ in 0..<steps {
             try await sendKey(.volumeUp)
             try await Task.sleep(for: .milliseconds(100))
         }
     }
-    
+
     public func volumeDown(steps: Int = 1) async throws {
         guard steps > 0 else { return }
-        
+
         #if canImport(OSLog)
         Logger.commands.info("Decreasing volume by \(steps) steps")
         #endif
-        
+
         for _ in 0..<steps {
             try await sendKey(.volumeDown)
             try await Task.sleep(for: .milliseconds(100))
         }
     }
-    
+
     public func mute() async throws {
         #if canImport(OSLog)
         Logger.commands.info("Toggling mute")
         #endif
-        
+
         try await sendKey(.mute)
     }
-    
+
     public func navigate(_ direction: NavigationDirection) async throws {
         #if canImport(OSLog)
         Logger.commands.debug("Navigating: \(direction)")
         #endif
-        
+
         try await sendKey(direction.keyCode)
     }
-    
+
     public func enter() async throws {
         #if canImport(OSLog)
         Logger.commands.debug("Pressing enter")
         #endif
-        
+
         try await sendKey(.enter)
     }
-    
+
     public func back() async throws {
         #if canImport(OSLog)
         Logger.commands.debug("Pressing back")
         #endif
-        
+
         try await sendKey(.back)
     }
-    
+
     public func home() async throws {
         #if canImport(OSLog)
         Logger.commands.info("Going to home screen")
         #endif
-        
+
         try await sendKey(.home)
     }
 }
@@ -523,15 +523,15 @@ actor RemoteControl: RemoteControlProtocol {
 actor AppManagement: AppManagementProtocol {
     private var webSocket: WebSocketClient?
     private var restClient: RESTClient?
-    
+
     func setWebSocket(_ ws: WebSocketClient) {
         self.webSocket = ws
     }
-    
+
     func setRESTClient(_ client: RESTClient?) {
         self.restClient = client
     }
-    
+
     /// List all installed applications on the TV
     ///
     /// Sends a WebSocket request to retrieve the list of installed apps.
@@ -551,21 +551,21 @@ actor AppManagement: AppManagementProtocol {
         guard let webSocket else {
             throw TVError.connectionFailed(reason: "Not connected")
         }
-        
+
         #if canImport(OSLog)
         Logger.commands.debug("Requesting app list via WebSocket")
         #endif
-        
+
         // Send app list request
         let message = AppListMessage.getAppList()
         let data = try JSONEncoder().encode(message)
         try await webSocket.send(data)
-        
+
         // Note: In a full implementation, we would wait for and parse the response
         // For now, return empty array as this requires response handling
         return []
     }
-    
+
     /// Launch a specific application on the TV
     ///
     /// Opens the specified app using its unique identifier. Common app IDs:
@@ -584,16 +584,16 @@ actor AppManagement: AppManagementProtocol {
         guard let webSocket else {
             throw TVError.connectionFailed(reason: "Not connected")
         }
-        
+
         #if canImport(OSLog)
         Logger.commands.info("Launching app: \(appID)")
         #endif
-        
+
         let message = try AppListMessage.launchApp(appID: appID)
         let data = try JSONEncoder().encode(message)
         try await webSocket.send(data)
     }
-    
+
     /// Close a running application on the TV
     ///
     /// Terminates the specified app using the REST API. The TV will typically
@@ -611,14 +611,14 @@ actor AppManagement: AppManagementProtocol {
         guard let restClient else {
             throw TVError.connectionFailed(reason: "REST client not available")
         }
-        
+
         #if canImport(OSLog)
         Logger.commands.info("Closing app via REST: \(appID)")
         #endif
-        
+
         try await restClient.closeApp(appID: appID)
     }
-    
+
     /// Get the current status of an application
     ///
     /// Queries the TV via REST API to determine if the app is running or stopped.
@@ -639,22 +639,22 @@ actor AppManagement: AppManagementProtocol {
         guard let restClient else {
             throw TVError.connectionFailed(reason: "REST client not available")
         }
-        
+
         #if canImport(OSLog)
         Logger.commands.debug("Getting app status via REST: \(appID)")
         #endif
-        
+
         let data = try await restClient.getAppStatus(appID: appID)
-        
+
         // Parse response to determine status
         if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
            let running = json["running"] as? Bool {
             return running ? .running : .stopped
         }
-        
+
         return .stopped
     }
-    
+
     /// Install an application from the TV's app store
     ///
     /// Attempts to install the specified app using the REST API.
@@ -677,11 +677,11 @@ actor AppManagement: AppManagementProtocol {
         guard let restClient else {
             throw TVError.connectionFailed(reason: "REST client not available")
         }
-        
+
         #if canImport(OSLog)
         Logger.commands.info("Installing app via REST: \(appID)")
         #endif
-        
+
         try await restClient.installApp(appID: appID)
     }
 }
@@ -726,11 +726,11 @@ actor ArtController: ArtControllerProtocol {
     private var messageHandlerToken: UUID?
     private let responseTimeout: Duration = .seconds(8)
     private let d2dClient = D2DSocketClient()
-    
+
     private struct ArtPayload: @unchecked Sendable {
         let value: [String: Any]
     }
-    
+
     private struct ArtResponse: @unchecked Sendable {
         let value: [String: Any]
     }
@@ -751,7 +751,7 @@ actor ArtController: ArtControllerProtocol {
             self.continuation = nil
         }
     }
-    
+
     func setWebSocket(_ ws: WebSocketClient) async {
         if let existing = webSocket, let token = messageHandlerToken {
             await existing.removeMessageHandler(token)
@@ -766,7 +766,7 @@ actor ArtController: ArtControllerProtocol {
         }
         messageHandlerToken = token
     }
-    
+
     func setRESTClient(_ client: RESTClient?) {
         self.restClient = client
     }
@@ -779,7 +779,7 @@ actor ArtController: ArtControllerProtocol {
         webSocket = nil
         await failAllPending(with: TVError.connectionFailed(reason: "WebSocket disconnected"))
     }
-    
+
     private func getOrGenerateUUID() -> String {
         if let artUUID {
             return artUUID
@@ -788,21 +788,21 @@ actor ArtController: ArtControllerProtocol {
         self.artUUID = uuid
         return uuid
     }
-    
+
     /// Send art app request via WebSocket
     private func sendArtRequest(_ request: [String: Any]) async throws {
         guard let webSocket else {
             throw TVError.connectionFailed(reason: "Not connected")
         }
-        
+
         var requestData = request
         requestData["id"] = getOrGenerateUUID()
-        
+
         let message = try ArtChannelMessage.artAppRequest(requestData)
         let data = try JSONEncoder().encode(message)
         try await webSocket.send(data)
     }
-    
+
     /// Check if Art Mode is supported on the connected TV
     ///
     /// Queries the TV's device information to determine if it's a Frame TV
@@ -824,19 +824,19 @@ actor ArtController: ArtControllerProtocol {
         guard let restClient else {
             throw TVError.connectionFailed(reason: "REST client not available")
         }
-        
+
         // Check device info for Frame TV support
         let data = try await restClient.getDeviceInfo()
-        
+
         if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
            let device = json["device"] as? [String: Any],
            let frameSupport = device["FrameTVSupport"] as? String {
             return frameSupport == "true"
         }
-        
+
         return false
     }
-    
+
     /// List all available art pieces on the TV
     ///
     /// Retrieves the list of art available in the TV's art library,
@@ -859,14 +859,14 @@ actor ArtController: ArtControllerProtocol {
         #if canImport(OSLog)
         Logger.commands.debug("Requesting art list")
         #endif
-        
+
         let response = try await performArtRequest(
             "get_content_list",
             additionalData: [
                 "category": NSNull()
             ]
         )
-        
+
         let contentList = coerceArrayOfDictionaries(
             response["content_list"] ?? response["art_list"]
         ) ?? []
@@ -874,7 +874,7 @@ actor ArtController: ArtControllerProtocol {
         cachedArtPieces = pieces
         return pieces
     }
-    
+
     /// Get the currently displayed art piece
     ///
     /// Retrieves information about the art currently shown on the TV.
@@ -894,7 +894,7 @@ actor ArtController: ArtControllerProtocol {
         #if canImport(OSLog)
         Logger.commands.debug("Requesting current artwork")
         #endif
-        
+
         let response = try await performArtRequest("get_current_artwork")
         let piece = parseArtPiece(from: response)
             ?? coerceArrayOfDictionaries(response["content_list"])?.compactMap { parseArtPiece(from: $0) }.first
@@ -909,7 +909,7 @@ actor ArtController: ArtControllerProtocol {
         }
         return art
     }
-    
+
     /// Select an art piece to display
     ///
     /// Changes the displayed artwork to the specified piece.
@@ -933,14 +933,14 @@ actor ArtController: ArtControllerProtocol {
         #if canImport(OSLog)
         Logger.commands.info("Selecting art: \(artID), show: \(show)")
         #endif
-        
+
         try await sendArtRequest([
             "request": "select_image",
             "content_id": artID,
             "show": show
         ])
     }
-    
+
     /// Upload a custom image to the TV's art library
     ///
     /// Uploads a custom JPEG or PNG image to the Frame TV. The image can optionally
@@ -1012,7 +1012,7 @@ actor ArtController: ArtControllerProtocol {
         }
         #endif
     }
-    
+
     /// Validate image data before upload
     /// - Parameters:
     ///   - imageData: Image data to validate
@@ -1023,7 +1023,7 @@ actor ArtController: ArtControllerProtocol {
         guard !imageData.isEmpty else {
             throw TVError.uploadFailed(reason: "Image data is empty")
         }
-        
+
         // Check maximum size (20 MB recommended limit)
         let maxSize = 20 * 1024 * 1024 // 20 MB
         guard imageData.count <= maxSize else {
@@ -1031,14 +1031,14 @@ actor ArtController: ArtControllerProtocol {
                 reason: "Image size (\(imageData.count) bytes) exceeds maximum limit of 20 MB"
             )
         }
-        
+
         // Validate image format by checking magic bytes
         guard imageData.count >= 4 else {
             throw TVError.uploadFailed(reason: "Image data too small to determine format")
         }
-        
+
         let bytes = [UInt8](imageData.prefix(4))
-        
+
         switch imageType {
         case .jpeg:
             // JPEG magic bytes: FF D8 FF
@@ -1051,12 +1051,12 @@ actor ArtController: ArtControllerProtocol {
                 throw TVError.invalidImageFormat(expected: .png)
             }
         }
-        
+
         #if canImport(OSLog)
         Logger.commands.debug("Image validation passed: \(imageType.rawValue), size: \(imageData.count) bytes")
         #endif
     }
-    
+
     private func uploadViaD2DPipeline(
         _ imageData: Data,
         type imageType: ImageType,
@@ -1291,7 +1291,7 @@ actor ArtController: ArtControllerProtocol {
     }
 
     // MARK: - Art Response Handling
-    
+
     private func performArtRequest(
         _ request: String,
         additionalData: [String: Any] = [:],
@@ -1305,7 +1305,7 @@ actor ArtController: ArtControllerProtocol {
             timeout: timeout ?? responseTimeout
         )
     }
-    
+
     private func awaitResponse(
         for request: String,
         payload: [String: Any],
@@ -1382,7 +1382,7 @@ actor ArtController: ArtControllerProtocol {
             )
         }
     }
-    
+
     private func completePending(
         for request: String,
         matching target: PendingContinuation,
@@ -1394,7 +1394,7 @@ actor ArtController: ArtControllerProtocol {
         pendingResponses[request] = queue.isEmpty ? nil : queue
         pending.complete(with: result)
     }
-    
+
     private func completePending(
         for request: String,
         result: Result<ArtResponse, any Error>
@@ -1404,7 +1404,7 @@ actor ArtController: ArtControllerProtocol {
         pendingResponses[request] = queue.isEmpty ? nil : queue
         pending.complete(with: result)
     }
-    
+
     private func failAllPending(with error: any Error) async {
         guard !pendingResponses.isEmpty else { return }
         let queues = pendingResponses.values
@@ -1415,7 +1415,7 @@ actor ArtController: ArtControllerProtocol {
             }
         }
     }
-    
+
     private func handleIncomingMessage(_ data: Data) async {
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let eventRaw = json["event"] as? String else {
@@ -1445,7 +1445,7 @@ actor ArtController: ArtControllerProtocol {
             await completePending(for: "get_photo_filter_list", result: .success(ArtResponse(value: payload)))
         case "d2d_service_message":
             guard var payload else { return }
-            
+
             // For d2d_service_message, the event field in the nested payload is the request identifier
             if payload["response"] == nil {
                 if let eventName = normalizeString(payload["event"]) {
@@ -1454,7 +1454,7 @@ actor ArtController: ArtControllerProtocol {
                     payload["response"] = requestName
                 }
             }
-            
+
             let eventName = normalizeString(payload["event"])?.lowercased()
             let status = normalizeString(payload["status"])?.lowercased()
             if eventName == "error" || status == "error" || status == "fail" {
@@ -1479,7 +1479,7 @@ actor ArtController: ArtControllerProtocol {
             break
         }
     }
-    
+
     private func responseIdentifier(from payload: [String: Any]) -> String? {
         if let response = normalizeString(payload["response"]) {
             return response
@@ -1489,7 +1489,7 @@ actor ArtController: ArtControllerProtocol {
         }
         return nil
     }
-    
+
     private func extractPayload(from value: Any?) -> [String: Any]? {
         if let dictionary = value as? [String: Any] {
             return dictionary
@@ -1501,7 +1501,7 @@ actor ArtController: ArtControllerProtocol {
         }
         return nil
     }
-    
+
     private func coerceArrayOfDictionaries(_ value: Any?) -> [[String: Any]]? {
         if let array = value as? [[String: Any]] {
             return array
@@ -1513,7 +1513,7 @@ actor ArtController: ArtControllerProtocol {
         }
         return nil
     }
-    
+
     private func parseArtPiece(from dictionary: [String: Any]) -> ArtPiece? {
         guard let identifier = normalizeString(
             dictionary["content_id"] ?? dictionary["contentId"] ?? dictionary["id"]
@@ -1540,7 +1540,7 @@ actor ArtController: ArtControllerProtocol {
             fileSize: fileSize
         )
     }
-    
+
     private func parseArtCategory(from value: Any?) -> ArtCategory {
         guard let string = normalizeString(value)?.lowercased() else { return .preloaded }
         if string.contains("store") || string.contains("purchase") {
@@ -1551,7 +1551,7 @@ actor ArtController: ArtControllerProtocol {
         }
         return .preloaded
     }
-    
+
     private func parseImageType(from value: Any?) -> ImageType {
         guard let string = normalizeString(value)?.lowercased() else { return .jpeg }
         if string.contains("png") {
@@ -1559,7 +1559,7 @@ actor ArtController: ArtControllerProtocol {
         }
         return .jpeg
     }
-    
+
     private func parseMatteStyle(from value: Any?) -> MatteStyle? {
         guard let string = normalizeString(value), !string.isEmpty else { return nil }
         if string.lowercased() == "none" {
@@ -1570,7 +1570,7 @@ actor ArtController: ArtControllerProtocol {
         }
         return MatteStyle(rawValue: string.lowercased())
     }
-    
+
     private func parseFilter(from value: Any?) -> PhotoFilter? {
         guard let string = normalizeString(value) else { return nil }
         if let filter = PhotoFilter(rawValue: string) {
@@ -1578,7 +1578,7 @@ actor ArtController: ArtControllerProtocol {
         }
         return PhotoFilter(rawValue: string.lowercased())
     }
-    
+
     private func parseDate(from value: Any?) -> Date? {
         if let timeInterval = value as? TimeInterval {
             return Date(timeIntervalSince1970: timeInterval)
@@ -1606,7 +1606,7 @@ actor ArtController: ArtControllerProtocol {
         }
         return nil
     }
-    
+
     private func buildThumbnailURL(from value: Any?) -> URL? {
         guard let path = normalizeString(value) else { return nil }
         if let url = URL(string: path), url.scheme != nil {
@@ -1617,7 +1617,7 @@ actor ArtController: ArtControllerProtocol {
         }
         return nil
     }
-    
+
     private func coerceInt(_ value: Any?) -> Int? {
         if let number = value as? NSNumber {
             return number.intValue
@@ -1627,7 +1627,7 @@ actor ArtController: ArtControllerProtocol {
         }
         return nil
     }
-    
+
     private func normalizeString(_ value: Any?) -> String? {
         if let string = value as? String {
             let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1638,7 +1638,7 @@ actor ArtController: ArtControllerProtocol {
         }
         return nil
     }
-    
+
     /// Parse REST upload response and extract content identifier
     /// - Parameter data: Raw response data from REST API
     /// - Returns: Content identifier string
@@ -1647,7 +1647,7 @@ actor ArtController: ArtControllerProtocol {
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw TVError.invalidResponse(details: "Unable to decode upload response")
         }
-        
+
         if let status = json["status"] {
             if let statusString = status as? String, statusString.lowercased() != "success" {
                 let message = (json["message"] as? String) ?? "Upload failed with status \(statusString)"
@@ -1658,21 +1658,21 @@ actor ArtController: ArtControllerProtocol {
                 throw TVError.uploadFailed(reason: message)
             }
         }
-        
+
         if let contentID = json["content_id"] as? String {
             return contentID
         }
         if let contentID = json["contentId"] as? String {
             return contentID
         }
-        
+
         if let message = json["message"] as? String {
             throw TVError.uploadFailed(reason: message)
         }
-        
+
         throw TVError.invalidResponse(details: "Upload response missing content identifier")
     }
-    
+
     /// Delete a single art piece from the TV's library
     ///
     /// Removes a custom uploaded image from the art library. Built-in art
@@ -1689,7 +1689,7 @@ actor ArtController: ArtControllerProtocol {
     public func delete(_ artID: String) async throws {
         try await deleteMultiple([artID])
     }
-    
+
     /// Delete multiple art pieces from the TV's library
     ///
     /// Removes multiple custom uploaded images in a single operation.
@@ -1707,15 +1707,15 @@ actor ArtController: ArtControllerProtocol {
         #if canImport(OSLog)
         Logger.commands.info("Deleting \(artIDs.count) art pieces")
         #endif
-        
+
         let contentIDList = artIDs.map { ["content_id": $0] }
-        
+
         try await sendArtRequest([
             "request": "delete_image_list",
             "content_id_list": contentIDList
         ])
     }
-    
+
     /// Get a thumbnail preview of an art piece
     ///
     /// Downloads a JPEG thumbnail of the specified art piece.
@@ -1738,9 +1738,9 @@ actor ArtController: ArtControllerProtocol {
         #if canImport(OSLog)
         Logger.commands.debug("Requesting thumbnail for: \(artID)")
         #endif
-        
+
         let connectionID = D2DSocketClient.generateConnectionID()
-        
+
         try await sendArtRequest([
             "request": "get_thumbnail",
             "content_id": artID,
@@ -1750,20 +1750,20 @@ actor ArtController: ArtControllerProtocol {
                 "id": getOrGenerateUUID()
             ]
         ])
-        
+
         // Note: Full implementation would:
         // 1. Wait for response with connection info
         // 2. Connect to D2D socket
         // 3. Read header (4 bytes length + JSON header)
         // 4. Read thumbnail data based on fileLength
         // 5. Return thumbnail data
-        
+
         throw TVError.commandFailed(
             code: 501,
             message: "Thumbnail download requires full D2D socket implementation"
         )
     }
-    
+
     /// Check if Art Mode is currently active
     ///
     /// Determines whether the TV is currently in Art Mode (displaying artwork)
@@ -1787,7 +1787,7 @@ actor ArtController: ArtControllerProtocol {
         #if canImport(OSLog)
         Logger.commands.debug("Checking art mode status")
         #endif
-        
+
         let response = try await performArtRequest("get_artmode_status")
         if let status = (response["status"] ?? response["value"]) as? String {
             return status.lowercased() == "on" || status == "1"
@@ -1797,7 +1797,7 @@ actor ArtController: ArtControllerProtocol {
         }
         throw TVError.invalidResponse(details: "Unable to determine Art Mode status")
     }
-    
+
     /// Toggle Art Mode on or off
     ///
     /// Switches the TV between Art Mode (displaying artwork) and normal TV mode.
@@ -1819,13 +1819,13 @@ actor ArtController: ArtControllerProtocol {
         #if canImport(OSLog)
         Logger.commands.info("Setting art mode: \(enabled)")
         #endif
-        
+
         try await sendArtRequest([
             "request": "set_artmode_status",
             "value": enabled ? "on" : "off"
         ])
     }
-    
+
     /// List all available photo filters
     ///
     /// Retrieves the list of photo filters that can be applied to artwork.
@@ -1848,7 +1848,7 @@ actor ArtController: ArtControllerProtocol {
         #if canImport(OSLog)
         Logger.commands.debug("Requesting photo filter list")
         #endif
-        
+
         let response = try await performArtRequest("get_photo_filter_list")
         if let filters = response["filter_list"] as? [[String: Any]] {
             return filters.compactMap { parseFilter(from: $0["id"] ?? $0["filter_id"]) }
@@ -1861,7 +1861,7 @@ actor ArtController: ArtControllerProtocol {
         }
         return []
     }
-    
+
     /// Apply a photo filter to an art piece
     ///
     /// Applies a visual filter effect to the specified artwork.
@@ -1888,7 +1888,7 @@ actor ArtController: ArtControllerProtocol {
         #if canImport(OSLog)
         Logger.commands.info("Applying filter \(filter.rawValue) to art: \(artID)")
         #endif
-        
+
         try await sendArtRequest([
             "request": "set_photo_filter",
             "content_id": artID,
@@ -1916,16 +1916,16 @@ private func withTimeout<T: Sendable>(
         group.addTask {
             try await operation()
         }
-        
+
         group.addTask {
             try await Task.sleep(for: timeout)
             throw TimeoutError()
         }
-        
+
         guard let result = try await group.next() else {
             throw TimeoutError()
         }
-        
+
         group.cancelAll()
         return result
     }

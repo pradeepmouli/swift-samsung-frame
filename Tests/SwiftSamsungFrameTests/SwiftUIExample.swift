@@ -11,21 +11,21 @@ import SwiftSamsungFrame
 @available(iOS 18.0, macOS 15.0, tvOS 18.0, watchOS 11.0, *)
 struct BasicRemoteView: View {
     @StateObject private var viewModel = TVRemoteViewModel()
-    
+
     var body: some View {
         VStack(spacing: 20) {
             // Connection status
             Text(viewModel.connectionState.description)
                 .font(.headline)
                 .foregroundColor(viewModel.connectionState == .connected ? .green : .gray)
-            
+
             // Error message
             if let error = viewModel.errorMessage {
                 Text(error)
                     .foregroundColor(.red)
                     .font(.caption)
             }
-            
+
             // Power button
             Button(action: {
                 Task { await viewModel.sendPowerCommand() }
@@ -35,7 +35,7 @@ struct BasicRemoteView: View {
             }
             .buttonStyle(.borderedProminent)
             .disabled(!viewModel.isConnected)
-            
+
             // Volume controls
             HStack {
                 Button(action: {
@@ -44,14 +44,14 @@ struct BasicRemoteView: View {
                     Label("Volume -", systemImage: "speaker.wave.1")
                 }
                 .buttonStyle(.bordered)
-                
+
                 Button(action: {
                     Task { await viewModel.sendMute() }
                 }) {
                     Label("Mute", systemImage: "speaker.slash")
                 }
                 .buttonStyle(.bordered)
-                
+
                 Button(action: {
                     Task { await viewModel.sendVolumeUp() }
                 }) {
@@ -60,7 +60,7 @@ struct BasicRemoteView: View {
                 .buttonStyle(.bordered)
             }
             .disabled(!viewModel.isConnected)
-            
+
             // Navigation pad
             VStack(spacing: 10) {
                 Button(action: {
@@ -70,7 +70,7 @@ struct BasicRemoteView: View {
                         .frame(width: 60, height: 40)
                 }
                 .buttonStyle(.bordered)
-                
+
                 HStack(spacing: 10) {
                     Button(action: {
                         Task { await viewModel.navigate(.left) }
@@ -79,7 +79,7 @@ struct BasicRemoteView: View {
                             .frame(width: 40, height: 60)
                     }
                     .buttonStyle(.bordered)
-                    
+
                     Button(action: {
                         Task { await viewModel.sendEnter() }
                     }) {
@@ -87,7 +87,7 @@ struct BasicRemoteView: View {
                             .frame(width: 60, height: 60)
                     }
                     .buttonStyle(.borderedProminent)
-                    
+
                     Button(action: {
                         Task { await viewModel.navigate(.right) }
                     }) {
@@ -96,7 +96,7 @@ struct BasicRemoteView: View {
                     }
                     .buttonStyle(.bordered)
                 }
-                
+
                 Button(action: {
                     Task { await viewModel.navigate(.down) }
                 }) {
@@ -106,7 +106,7 @@ struct BasicRemoteView: View {
                 .buttonStyle(.bordered)
             }
             .disabled(!viewModel.isConnected)
-            
+
             // Back and Home buttons
             HStack {
                 Button(action: {
@@ -115,7 +115,7 @@ struct BasicRemoteView: View {
                     Label("Back", systemImage: "arrowshape.turn.up.backward")
                 }
                 .buttonStyle(.bordered)
-                
+
                 Button(action: {
                     Task { await viewModel.sendHome() }
                 }) {
@@ -142,22 +142,22 @@ class TVRemoteViewModel: ObservableObject {
     @Published var connectionState: ConnectionState = .disconnected
     @Published var errorMessage: String?
     @Published var deviceName: String?
-    
+
     private let client = TVClient()
     private let storage = KeychainTokenStorage()
-    
+
     var isConnected: Bool {
         connectionState == .connected
     }
-    
+
     func connect(to host: String) async {
         connectionState = .connecting
         errorMessage = nil
-        
+
         do {
             _ = try await client.connect(to: host, tokenStorage: storage)
             connectionState = .connected
-            
+
             // Fetch device info
             let device = try await client.deviceInfo()
             deviceName = device.name
@@ -166,47 +166,47 @@ class TVRemoteViewModel: ObservableObject {
             connectionState = .error
         }
     }
-    
+
     func disconnect() async {
         await client.disconnect()
         connectionState = .disconnected
         deviceName = nil
     }
-    
+
     // MARK: - Remote Commands
-    
+
     func sendPowerCommand() async {
         await sendCommand { try await $0.remote.power() }
     }
-    
+
     func sendVolumeUp() async {
         await sendCommand { try await $0.remote.volumeUp(steps: 1) }
     }
-    
+
     func sendVolumeDown() async {
         await sendCommand { try await $0.remote.volumeDown(steps: 1) }
     }
-    
+
     func sendMute() async {
         await sendCommand { try await $0.remote.mute() }
     }
-    
+
     func navigate(_ direction: NavigationDirection) async {
         await sendCommand { try await $0.remote.navigate(direction) }
     }
-    
+
     func sendEnter() async {
         await sendCommand { try await $0.remote.enter() }
     }
-    
+
     func sendBack() async {
         await sendCommand { try await $0.remote.back() }
     }
-    
+
     func sendHome() async {
         await sendCommand { try await $0.remote.home() }
     }
-    
+
     private func sendCommand(_ action: @escaping (TVClient) async throws -> Void) async {
         do {
             try await action(client)
@@ -223,7 +223,7 @@ class TVRemoteViewModel: ObservableObject {
 @available(iOS 18.0, macOS 15.0, tvOS 18.0, watchOS 11.0, *)
 struct AppLauncherView: View {
     @StateObject private var viewModel = AppLauncherViewModel()
-    
+
     var body: some View {
         NavigationView {
             List(viewModel.apps) { app in
@@ -237,9 +237,9 @@ struct AppLauncherView: View {
                                 .foregroundColor(.secondary)
                         }
                     }
-                    
+
                     Spacer()
-                    
+
                     Button("Launch") {
                         Task {
                             await viewModel.launch(app)
@@ -265,9 +265,9 @@ struct AppLauncherView: View {
 class AppLauncherViewModel: ObservableObject {
     @Published var apps: [TVApp] = []
     @Published var errorMessage: String?
-    
+
     private let client = TVClient()
-    
+
     func connect(to host: String) async {
         do {
             _ = try await client.connect(to: host)
@@ -275,7 +275,7 @@ class AppLauncherViewModel: ObservableObject {
             errorMessage = error.localizedDescription
         }
     }
-    
+
     func loadApps() async {
         do {
             apps = try await client.apps.list()
@@ -284,7 +284,7 @@ class AppLauncherViewModel: ObservableObject {
             errorMessage = error.localizedDescription
         }
     }
-    
+
     func launch(_ app: TVApp) async {
         do {
             try await client.apps.launch(app.id)
@@ -301,11 +301,11 @@ class AppLauncherViewModel: ObservableObject {
 @available(iOS 18.0, macOS 15.0, tvOS 18.0, watchOS 11.0, *)
 struct ArtGalleryView: View {
     @StateObject private var viewModel = ArtGalleryViewModel()
-    
+
     let columns = [
         GridItem(.adaptive(minimum: 150))
     ]
-    
+
     var body: some View {
         NavigationView {
             ScrollView {
@@ -347,7 +347,7 @@ struct ArtGalleryView: View {
 struct ArtPieceCard: View {
     let art: ArtPiece
     let onSelect: () async -> Void
-    
+
     var body: some View {
         VStack {
             // Placeholder for art thumbnail
@@ -359,11 +359,11 @@ struct ArtPieceCard: View {
                         .foregroundColor(.gray)
                         .font(.largeTitle)
                 )
-            
+
             Text(art.title)
                 .font(.caption)
                 .lineLimit(1)
-            
+
             Button("Select") {
                 Task {
                     await onSelect()
@@ -382,9 +382,9 @@ class ArtGalleryViewModel: ObservableObject {
     @Published var isSupported = false
     @Published var isArtModeActive = false
     @Published var errorMessage: String?
-    
+
     private let client = TVClient()
-    
+
     func connect(to host: String) async {
         do {
             _ = try await client.connect(to: host)
@@ -396,10 +396,10 @@ class ArtGalleryViewModel: ObservableObject {
             errorMessage = error.localizedDescription
         }
     }
-    
+
     func loadArt() async {
         guard isSupported else { return }
-        
+
         do {
             artPieces = try await client.art.listAvailable()
             errorMessage = nil
@@ -407,7 +407,7 @@ class ArtGalleryViewModel: ObservableObject {
             errorMessage = error.localizedDescription
         }
     }
-    
+
     func select(_ art: ArtPiece) async {
         do {
             try await client.art.select(art.id, show: true)
@@ -416,7 +416,7 @@ class ArtGalleryViewModel: ObservableObject {
             errorMessage = error.localizedDescription
         }
     }
-    
+
     func toggleArtMode() async {
         do {
             try await client.art.setArtMode(enabled: !isArtModeActive)
@@ -435,7 +435,7 @@ class ArtGalleryViewModel: ObservableObject {
 @available(iOS 18.0, macOS 15.0, tvOS 18.0, *)
 struct DeviceDiscoveryView: View {
     @StateObject private var viewModel = DiscoveryViewModel()
-    
+
     var body: some View {
         NavigationView {
             List {
@@ -480,14 +480,14 @@ struct DeviceDiscoveryView: View {
 class DiscoveryViewModel: ObservableObject {
     @Published var discoveredDevices: [TVDevice] = []
     @Published var isScanning = false
-    
+
     private let discovery = DiscoveryService()
     private var scanningTask: Task<Void, Never>?
-    
+
     func startScanning() async {
         isScanning = true
         discoveredDevices.removeAll()
-        
+
         scanningTask = Task {
             for await result in discovery.discover(timeout: .seconds(10)) {
                 // Check if device already discovered
@@ -498,7 +498,7 @@ class DiscoveryViewModel: ObservableObject {
             isScanning = false
         }
     }
-    
+
     func stopScanning() async {
         scanningTask?.cancel()
     discovery.cancel()
@@ -513,18 +513,18 @@ class DiscoveryViewModel: ObservableObject {
 @available(iOS 18.0, macOS 15.0, tvOS 18.0, watchOS 11.0, *)
 struct ConnectionStatusView: View {
     let state: ConnectionState
-    
+
     var body: some View {
         HStack {
             Circle()
                 .fill(statusColor)
                 .frame(width: 10, height: 10)
-            
+
             Text(state.description)
                 .font(.caption)
         }
     }
-    
+
     private var statusColor: Color {
         switch state {
         case .connected:

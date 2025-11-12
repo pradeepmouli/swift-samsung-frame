@@ -51,7 +51,7 @@ public actor WebSocketClient {
     public func connect(to url: URL, protocols: [String] = []) async throws {
         print("[WebSocketClient] Connecting to: \(url)")
         print("[WebSocketClient] Protocols: \(protocols.isEmpty ? "(none)" : protocols.joined(separator: ", "))")
-        
+
         let configuration = URLSessionConfiguration.default
         configuration.timeoutIntervalForRequest = 30
         configuration.timeoutIntervalForResource = 300
@@ -69,13 +69,13 @@ public actor WebSocketClient {
     webSocketTask = session.webSocketTask(with: url, protocols: protocols)
         print("[WebSocketClient] WebSocket task created, resuming...")
         webSocketTask?.resume()
-        
+
         isConnected = true
 
         // Start receiving messages immediately
         print("[WebSocketClient] Starting receive loop...")
         startReceiving()
-        
+
         // Send a ping to test connection
         print("[WebSocketClient] Sending ping to test connection...")
         webSocketTask?.sendPing { error in

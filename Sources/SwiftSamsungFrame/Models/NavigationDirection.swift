@@ -9,7 +9,7 @@ public enum NavigationDirection: Sendable, Codable, CustomStringConvertible {
     case down
     case left
     case right
-    
+
     public var description: String {
         switch self {
         case .up: return "up"

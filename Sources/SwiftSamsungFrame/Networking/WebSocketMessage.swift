@@ -4,10 +4,14 @@
 import Foundation
 
 /// WebSocket message types for Samsung TV communication
+///
+/// Encodes and decodes messages in Samsung's WebSocket protocol format.
+/// Supports remote control, authentication, and channel-specific messages.
 public struct WebSocketMessage: Sendable, Codable {
     let method: String
     let params: Params
 
+    /// Message parameters structure following Samsung TV protocol
     struct Params: Sendable, Codable {
         let Cmd: String?
         let DataOfCmd: String?
@@ -34,6 +38,10 @@ public struct WebSocketMessage: Sendable, Codable {
     }
 
     /// Create a remote control command message
+    /// - Parameters:
+    ///   - key: The key code to send (e.g., "KEY_POWER", "KEY_VOLUP")
+    ///   - type: The command type (default: "Click")
+    /// - Returns: WebSocket message formatted for Samsung TV remote control
     static func remoteControl(key: String, type: String = "Click") -> WebSocketMessage {
         WebSocketMessage(
             method: "ms.remote.control",
@@ -48,7 +56,11 @@ public struct WebSocketMessage: Sendable, Codable {
         )
     }
 
-    /// Create an authentication message
+    /// Create an authentication message for initial TV pairing
+    /// - Parameters:
+    ///   - token: Optional authentication token from previous connection (use "None" if first connection)
+    ///   - clientName: Client application identifier (default: "SwiftSamsungFrame")
+    /// - Returns: WebSocket authentication message
     static func authentication(token: String?, clientName: String = "SwiftSamsungFrame") -> WebSocketMessage {
         WebSocketMessage(
             method: "ms.channel.connect",
@@ -64,7 +76,9 @@ public struct WebSocketMessage: Sendable, Codable {
     }
 }
 
-/// WebSocket response message
+/// WebSocket response message received from Samsung TV
+///
+/// Represents responses to commands and events sent by the TV.
 public struct WebSocketResponse: Sendable, Codable {
     let event: String?
     let data: ResponseData?

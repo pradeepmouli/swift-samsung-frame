@@ -15,7 +15,8 @@ public protocol TVClientProtocol: Sendable {
     func connect(
         to host: String,
         port: Int,
-        tokenStorage: (any TokenStorageProtocol)?
+        tokenStorage: (any TokenStorageProtocol)?,
+        channel: WebSocketChannel
     ) async throws -> ConnectionSession
     
     /// Disconnect from the TV
@@ -37,6 +38,21 @@ public protocol TVClientProtocol: Sendable {
     
     /// Art mode interface (Frame TVs only)
     var art: any ArtControllerProtocol { get }
+}
+
+public extension TVClientProtocol {
+    func connect(
+        to host: String,
+        port: Int = 8001,
+        tokenStorage: (any TokenStorageProtocol)? = nil
+    ) async throws -> ConnectionSession {
+        try await connect(
+            to: host,
+            port: port,
+            tokenStorage: tokenStorage,
+            channel: .remoteControl
+        )
+    }
 }
 
 /// Interface for sending remote control commands

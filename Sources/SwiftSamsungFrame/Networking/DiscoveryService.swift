@@ -3,6 +3,9 @@
 
 import Foundation
 
+// NOTE: Discovery relies on the Network framework. On platforms where it's unavailable,
+// we gracefully provide an empty stream to keep API behavior predictable.
+
 #if canImport(OSLog)
 import OSLog
 #endif
@@ -20,12 +23,15 @@ public actor DiscoveryService: DiscoveryServiceProtocol {
     /// - Parameter timeout: Discovery timeout duration (default: 10 seconds)
     /// - Returns: AsyncStream of discovered devices
     public nonisolated func discover(timeout: Duration = .seconds(10)) -> AsyncStream<DiscoveryResult> {
+        #if canImport(Network)
         return AsyncStream { continuation in
-            // Start new discovery task
-            Task {
-                await self.performDiscovery(timeout: timeout, continuation: continuation)
-            }
+            Task { await self.performDiscovery(timeout: timeout, continuation: continuation) }
         }
+        #else
+        return AsyncStream { continuation in
+            continuation.finish()
+        }
+        #endif
     }
     
     /// Perform discovery with cross-protocol deduplication
@@ -38,9 +44,14 @@ public actor DiscoveryService: DiscoveryServiceProtocol {
         
         guard !isDiscovering else { return }
         
-        isDiscovering = true
-        mdnsBrowser = MDNSBrowser()
-        ssdpBrowser = SSDPBrowser()
+    isDiscovering = true
+    #if canImport(Network)
+    mdnsBrowser = MDNSBrowser()
+    ssdpBrowser = SSDPBrowser()
+    #else
+    mdnsBrowser = nil
+    ssdpBrowser = nil
+    #endif
         
         #if canImport(OSLog)
         Logger.discovery.info("Starting TV discovery with \(timeout.seconds())s timeout")
@@ -49,13 +60,14 @@ public actor DiscoveryService: DiscoveryServiceProtocol {
         // Track discovered devices for cross-protocol deduplication
         var discoveredDevices: Set<String> = []
         
-        // Discovery strategy: mDNS first (3s), then SSDP for remaining time
+    // Discovery strategy: mDNS first (3s), then SSDP for remaining time
         let mdnsTimeout = Duration.seconds(3)
         let remainingTime = timeout.seconds() - mdnsTimeout.seconds()
         let ssdpTimeout = Duration.seconds(max(0, remainingTime))
         
-        // Phase 1: Try mDNS first (best for Frame TVs and modern Samsung TVs)
-        if let mdnsBrowser {
+    // Phase 1: Try mDNS first (best for Frame TVs and modern Samsung TVs)
+    #if canImport(Network)
+    if let mdnsBrowser {
             #if canImport(OSLog)
             Logger.discovery.debug("Phase 1: mDNS discovery (\(mdnsTimeout.seconds())s)")
             #endif
@@ -73,10 +85,10 @@ public actor DiscoveryService: DiscoveryServiceProtocol {
                     continuation.yield(result)
                 }
             }
-        }
+    }
         
-        // Phase 2: Try SSDP for remaining time (fallback for older models)
-        if ssdpTimeout.seconds() > 0, let ssdpBrowser {
+    // Phase 2: Try SSDP for remaining time (fallback for older models)
+    if ssdpTimeout.seconds() > 0, let ssdpBrowser {
             #if canImport(OSLog)
             Logger.discovery.debug("Phase 2: SSDP discovery (\(ssdpTimeout.seconds())s)")
             #endif
@@ -94,7 +106,8 @@ public actor DiscoveryService: DiscoveryServiceProtocol {
                     continuation.yield(result)
                 }
             }
-        }
+    }
+    #endif
         
         isDiscovering = false
         continuation.finish()

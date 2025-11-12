@@ -49,44 +49,40 @@ public actor D2DSocketClient {
         self.connection = conn
         
         // Start connection
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            var isResumed = false
-            // NSLock is used here because stateUpdateHandler is called on a different queue
-            // (the DispatchQueue created below), while the timeout Task runs on the actor's executor.
-            // This prevents race conditions when both try to resume the continuation.
-            let resumeLock = NSLock()
-            var timeoutTask: Task<Void, Never>?
-            
-            func resumeOnce(with result: Result<Void, Error>) {
-                resumeLock.lock()
-                defer { resumeLock.unlock() }
-                if !isResumed {
-                    isResumed = true
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
+            final class ResumeState: @unchecked Sendable {
+                private var resumed = false
+                private let lock = NSLock()
+                var timeoutTask: Task<Void, Never>?
+                func resumeOnce(_ result: Result<Void, any Error>, continuation: CheckedContinuation<Void, any Error>) {
+                    lock.lock(); defer { lock.unlock() }
+                    guard !resumed else { return }
+                    resumed = true
                     timeoutTask?.cancel()
-                    conn.stateUpdateHandler = nil
                     continuation.resume(with: result)
                 }
             }
+            let state = ResumeState()
             
-            conn.stateUpdateHandler = { state in
-                switch state {
+            conn.stateUpdateHandler = { st in
+                switch st {
                 case .ready:
                     #if canImport(OSLog)
                     Logger.networking.debug("D2D: Connection ready")
                     #endif
-                    resumeOnce(with: .success(()))
+                    state.resumeOnce(.success(()), continuation: continuation)
                     
                 case .failed(let error):
                     #if canImport(OSLog)
                     Logger.networking.error("D2D: Connection failed: \(error.localizedDescription)")
                     #endif
-                    resumeOnce(with: .failure(TVError.connectionFailed(reason: error.localizedDescription)))
+                    state.resumeOnce(.failure(TVError.connectionFailed(reason: error.localizedDescription)), continuation: continuation)
                     
                 case .cancelled:
                     #if canImport(OSLog)
                     Logger.networking.debug("D2D: Connection cancelled")
                     #endif
-                    resumeOnce(with: .failure(TVError.connectionFailed(reason: "Connection cancelled")))
+                    state.resumeOnce(.failure(TVError.connectionFailed(reason: "Connection cancelled")), continuation: continuation)
                     
                 default:
                     break
@@ -97,9 +93,9 @@ public actor D2DSocketClient {
             conn.start(queue: queue)
             
             // Set timeout
-            timeoutTask = Task {
+            state.timeoutTask = Task {
                 try? await Task.sleep(for: self.timeout)
-                resumeOnce(with: .failure(TVError.timeout))
+                state.resumeOnce(.failure(TVError.timeout(operation: "D2DConnect")), continuation: continuation)
             }
         }
         
@@ -166,7 +162,7 @@ public actor D2DSocketClient {
         )
         
         // Receive data
-        let receivedData = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Data, Error>) in
+    let receivedData = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Data, any Error>) in
             conn.receive(minimumIncompleteLength: 1, maximumLength: expectedLength) { content, _, isComplete, error in
                 if let error {
                     #if canImport(OSLog)

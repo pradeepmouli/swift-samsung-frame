@@ -27,14 +27,23 @@ actor MDNSBrowser {
         discoveredDevices.removeAll()
         
         #if canImport(OSLog)
-        Logger.discovery.info("Starting mDNS discovery for Samsung TVs")
+    Logger.discovery.info("Starting mDNS discovery for Samsung TVs")
+    Logger.discovery.debug("Discovery timeout: \(timeout.components.seconds) seconds")
         #endif
         
         // Create browser for Samsung remote service
         let parameters = NWParameters()
         parameters.includePeerToPeer = false
+
+    #if canImport(OSLog)
+    Logger.discovery.debug("NWParameters configured. includePeerToPeer=false")
+    #endif
         
         browser = NWBrowser(for: .bonjour(type: "_samsung-remote._tcp", domain: nil), using: parameters)
+
+    #if canImport(OSLog)
+    Logger.discovery.debug("NWBrowser created for _samsung-remote._tcp")
+    #endif
         
         // Set up state change handler
         browser?.stateUpdateHandler = { [weak self] state in
@@ -46,12 +55,18 @@ actor MDNSBrowser {
         // Set up browse results handler
         browser?.browseResultsChangedHandler = { [weak self] results, changes in
             Task {
+                #if canImport(OSLog)
+                Logger.discovery.debug("Browse results changed. results=\(results.count) changes=\(changes.count)")
+                #endif
                 await self?.handleBrowseResults(results, changes: changes, continuation: continuation)
             }
         }
         
         // Start browsing
         let queue = DispatchQueue(label: "com.swiftsamsungframe.mdns")
+        #if canImport(OSLog)
+        Logger.discovery.debug("Starting NWBrowser on queue com.swiftsamsungframe.mdns")
+        #endif
         browser?.start(queue: queue)
         
         // Wait for timeout
@@ -83,10 +98,11 @@ actor MDNSBrowser {
         case .ready:
             Logger.discovery.debug("mDNS browser ready")
         case .failed(let error):
-            Logger.discovery.error("mDNS browser failed: \(error.localizedDescription)")
+            Logger.discovery.error("mDNS browser failed: \(error.localizedDescription) code=\((error as NSError).code)")
         case .cancelled:
             Logger.discovery.debug("mDNS browser cancelled")
         default:
+            Logger.discovery.debug("mDNS browser state changed: \(String(describing: state))")
             break
         }
         #endif
@@ -101,6 +117,9 @@ actor MDNSBrowser {
         for change in changes {
             switch change {
             case .identical:
+                #if canImport(OSLog)
+                Logger.discovery.debug("Unchanged browse result observed")
+                #endif
                 break
             case .added(let result), .changed(old: _, new: let result, flags: _):
                 Task {
@@ -113,8 +132,14 @@ actor MDNSBrowser {
                 // Remove from discovered devices
                 if case .service(let name, _, _, _) = result.endpoint {
                     discoveredDevices.removeValue(forKey: name)
+                    #if canImport(OSLog)
+                    Logger.discovery.debug("Removed cached device: \(name)")
+                    #endif
                 }
             @unknown default:
+                #if canImport(OSLog)
+                Logger.discovery.warning("Unhandled browse result change encountered")
+                #endif
                 break
             }
         }
@@ -126,6 +151,9 @@ actor MDNSBrowser {
         continuation: AsyncStream<DiscoveryResult>.Continuation
     ) async {
         guard case .service(let name, let type, let domain, _) = result.endpoint else {
+            #if canImport(OSLog)
+            Logger.discovery.debug("Ignoring non-service endpoint: \(result.endpoint.debugDescription)")
+            #endif
             return
         }
         
@@ -135,19 +163,24 @@ actor MDNSBrowser {
         
         // Resolve the endpoint to get IP address
         let connection = NWConnection(to: result.endpoint, using: .tcp)
+
+        #if canImport(OSLog)
+        Logger.discovery.debug("Starting resolution for service \(name)")
+        #endif
         
         await withCheckedContinuation { (innerContinuation: CheckedContinuation<Void, Never>) in
-            var hasResumed = false
-            let resumeLock = NSLock()
-            
-            func resumeOnce() {
-                resumeLock.lock()
-                defer { resumeLock.unlock() }
-                if !hasResumed {
-                    hasResumed = true
-                    innerContinuation.resume()
+            final class ResumeBox: @unchecked Sendable {
+                private var resumed = false
+                private let lock = NSLock()
+                func resume(_ continuation: CheckedContinuation<Void, Never>) {
+                    lock.lock(); defer { lock.unlock() }
+                    guard !resumed else { return }
+                    resumed = true
+                    continuation.resume()
                 }
             }
+            let box = ResumeBox()
+            @Sendable func resumeOnce() { box.resume(innerContinuation) }
             
             connection.stateUpdateHandler = { [weak self] state in
                 switch state {
@@ -169,6 +202,7 @@ actor MDNSBrowser {
                         
                         #if canImport(OSLog)
                         Logger.discovery.info("Resolved device: \(name) at \(hostString):\(port.rawValue)")
+                        Logger.discovery.debug("Service type=\(type) domain=\(domain) metadata=\(String(describing: result.metadata))")
                         #endif
                         
                         // Create discovery result
@@ -194,21 +228,40 @@ actor MDNSBrowser {
                     connection.cancel()
                     resumeOnce()
                     
-                case .failed, .cancelled:
+                case .failed(let error):
+                    #if canImport(OSLog)
+                    Logger.discovery.error("Resolution failed for \(name): \(error.localizedDescription)")
+                    #endif
+                    connection.cancel()
+                    resumeOnce()
+
+                case .cancelled:
+                    #if canImport(OSLog)
+                    Logger.discovery.debug("Resolution cancelled for \(name)")
+                    #endif
                     connection.cancel()
                     resumeOnce()
                     
                 default:
+                    #if canImport(OSLog)
+                    Logger.discovery.debug("Connection state for \(name) changed: \(String(describing: state))")
+                    #endif
                     break
                 }
             }
             
             let queue = DispatchQueue(label: "com.swiftsamsungframe.mdns.resolve")
+            #if canImport(OSLog)
+            Logger.discovery.debug("Starting resolution connection on queue com.swiftsamsungframe.mdns.resolve")
+            #endif
             connection.start(queue: queue)
             
             // Set a timeout for resolution
             Task {
                 try? await Task.sleep(for: .seconds(5))
+                #if canImport(OSLog)
+                Logger.discovery.debug("Resolution timeout for \(name)")
+                #endif
                 connection.cancel()
                 resumeOnce()
             }
@@ -224,11 +277,18 @@ actor MDNSBrowser {
         
         // Avoid duplicates
         guard discoveredDevices[deviceId] == nil else {
+            #if canImport(OSLog)
+            Logger.discovery.debug("Skipping duplicate discovery for \(deviceId)")
+            #endif
             return
         }
         
         discoveredDevices[deviceId] = result
         continuation.yield(result)
+
+        #if canImport(OSLog)
+        Logger.discovery.info("Published discovery result for \(deviceId)")
+        #endif
     }
 }
 

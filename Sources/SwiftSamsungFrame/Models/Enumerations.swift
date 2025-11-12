@@ -97,6 +97,32 @@ public enum TokenScope: String, Sendable, Codable {
     case deviceInfo
 }
 
+/// WebSocket channel types exposed by Samsung TVs
+public enum WebSocketChannel: Sendable, Codable {
+    case remoteControl
+    case artApp
+
+    /// Path component for the WebSocket endpoint
+    public var path: String {
+        switch self {
+        case .remoteControl:
+            return "/api/v2/channels/samsung.remote.control"
+        case .artApp:
+            return "/api/v2/channels/com.samsung.art-app"
+        }
+    }
+
+    /// Suggested subprotocols for the channel handshake
+    public var subprotocols: [String] {
+        switch self {
+        case .remoteControl:
+            return ["com.samsung.remote-control"]
+        case .artApp:
+            return ["com.samsung.art-app"]
+        }
+    }
+}
+
 /// Remote control key codes
 public enum KeyCode: String, Sendable, Codable {
     // Power

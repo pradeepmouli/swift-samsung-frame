@@ -180,11 +180,11 @@ class TVRemoteViewModel: ObservableObject {
     }
     
     func sendVolumeUp() async {
-        await sendCommand { try await $0.remote.volumeUp() }
+        await sendCommand { try await $0.remote.volumeUp(steps: 1) }
     }
     
     func sendVolumeDown() async {
-        await sendCommand { try await $0.remote.volumeDown() }
+        await sendCommand { try await $0.remote.volumeDown(steps: 1) }
     }
     
     func sendMute() async {
@@ -360,7 +360,7 @@ struct ArtPieceCard: View {
                         .font(.largeTitle)
                 )
             
-            Text(art.title ?? "Untitled")
+            Text(art.title)
                 .font(.caption)
                 .lineLimit(1)
             
@@ -438,16 +438,18 @@ struct DeviceDiscoveryView: View {
     
     var body: some View {
         NavigationView {
-            List(viewModel.discoveredDevices) { device in
-                VStack(alignment: .leading) {
-                    Text(device.name)
-                        .font(.headline)
-                    Text(device.host)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Text(device.model)
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
+            List {
+                ForEach(viewModel.discoveredDevices) { device in
+                    VStack(alignment: .leading) {
+                        Text(device.name)
+                            .font(.headline)
+                        Text(device.host)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text(device.modelName ?? "")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
                 }
             }
             .navigationTitle("Discovered TVs")
@@ -499,7 +501,7 @@ class DiscoveryViewModel: ObservableObject {
     
     func stopScanning() async {
         scanningTask?.cancel()
-        await discovery.cancel()
+    discovery.cancel()
         isScanning = false
     }
 }
@@ -527,8 +529,10 @@ struct ConnectionStatusView: View {
         switch state {
         case .connected:
             return .green
-        case .connecting:
+        case .connecting, .authenticating:
             return .yellow
+        case .disconnecting:
+            return .orange
         case .disconnected:
             return .gray
         case .error:
@@ -546,8 +550,12 @@ extension ConnectionState: CustomStringConvertible {
             return "Disconnected"
         case .connecting:
             return "Connecting..."
+        case .authenticating:
+            return "Authenticating..."
         case .connected:
             return "Connected"
+        case .disconnecting:
+            return "Disconnecting..."
         case .error:
             return "Error"
         }

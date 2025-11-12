@@ -60,6 +60,9 @@ public actor MockTVClient: TVClientProtocol {
     
     /// Last token storage passed to connect()
     public private(set) var lastTokenStorage: (any TokenStorageProtocol)?
+
+    /// Last channel passed to connect()
+    public private(set) var lastChannel: WebSocketChannel?
     
     // MARK: - Sub-interfaces
     
@@ -84,12 +87,14 @@ public actor MockTVClient: TVClientProtocol {
     public func connect(
         to host: String,
         port: Int = 8001,
-        tokenStorage: (any TokenStorageProtocol)? = nil
+        tokenStorage: (any TokenStorageProtocol)? = nil,
+        channel: WebSocketChannel = .remoteControl
     ) async throws -> ConnectionSession {
         connectCallCount += 1
         lastConnectHost = host
         lastConnectPort = port
         lastTokenStorage = tokenStorage
+        lastChannel = channel
         
         if let error = connectError {
             throw error

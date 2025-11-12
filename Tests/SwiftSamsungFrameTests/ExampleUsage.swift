@@ -212,7 +212,7 @@ func exampleDeviceDiscovery() async throws {
     
     for await result in discovery.discover(timeout: .seconds(5)) {
         print("Discovered: \(result.device.name) at \(result.device.host)")
-        print("  Method: \(result.method)")
+        print("  Method: \(result.discoveryMethod)")
         foundDevices.append(result.device)
     }
     
@@ -325,8 +325,8 @@ func examplePlatformSpecific() async throws {
         if !imageData.isEmpty {
             let artID = try await client.art.upload(
                 imageData,
-                imageType: .jpeg,
-                matte: .modern
+                type: .jpeg,
+                matte: .modernBeige
             )
             print("Uploaded art with ID: \(artID)")
         }

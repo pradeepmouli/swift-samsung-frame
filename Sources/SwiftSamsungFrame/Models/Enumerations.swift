@@ -97,7 +97,49 @@ public enum TokenScope: String, Sendable, Codable {
     case deviceInfo
 }
 
-/// Remote control key codes
+/// WebSocket channel types exposed by Samsung TVs
+///
+/// Samsung TVs expose different WebSocket channels for different functionalities.
+/// Each channel has a specific path and protocol requirements.
+public enum WebSocketChannel: Sendable, Codable {
+    /// Standard remote control channel for basic TV control
+    case remoteControl
+    /// Art mode channel for Frame TV art management
+    case artApp
+
+    /// Path component for the WebSocket endpoint
+    /// - Returns: URL path for the specific channel
+    public var path: String {
+        switch self {
+        case .remoteControl:
+            return "/api/v2/channels/samsung.remote.control"
+        case .artApp:
+            return "/api/v2/channels/com.samsung.art-app"
+        }
+    }
+
+    /// Suggested subprotocols for the channel handshake
+    /// - Returns: Array of WebSocket subprotocol strings (typically optional for Samsung TVs)
+    public var subprotocols: [String] {
+        switch self {
+        case .remoteControl:
+            return ["com.samsung.remote-control"]
+        case .artApp:
+            return ["com.samsung.art-app"]
+        }
+    }
+}
+
+/// Remote control key codes for Samsung TVs
+///
+/// Comprehensive list of supported remote control keys including power, volume,
+/// navigation, playback, channel control, menu navigation, and number pad.
+///
+/// Example usage:
+/// ```swift
+/// try await client.remote.sendKey(.power)
+/// try await client.remote.sendKey(.volumeUp)
+/// ```
 public enum KeyCode: String, Sendable, Codable {
     // Power
     case power = "KEY_POWER"

@@ -17,6 +17,10 @@ let package = Package(
             name: "SwiftSamsungFrame",
             targets: ["SwiftSamsungFrame"]
         ),
+        .executable(
+            name: "ArtDiagnostics",
+            targets: ["ArtDiagnostics"]
+        ),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -31,6 +35,15 @@ let package = Package(
         .testTarget(
             name: "SwiftSamsungFrameTests",
             dependencies: ["SwiftSamsungFrame"],
+            swiftSettings: [
+                .enableUpcomingFeature("ExistentialAny"),
+                .enableUpcomingFeature("StrictConcurrency"),
+            ]
+        ),
+        .executableTarget(
+            name: "ArtDiagnostics",
+            dependencies: ["SwiftSamsungFrame"],
+            path: "Scripts",
             swiftSettings: [
                 .enableUpcomingFeature("ExistentialAny"),
                 .enableUpcomingFeature("StrictConcurrency"),

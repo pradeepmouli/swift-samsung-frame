@@ -3,37 +3,38 @@
 
 import Foundation
 
+// NOTE: We store a reference to the higher-level WebSocketClient abstraction instead of the raw
+// URLSessionWebSocketTask. This aligns the session with the TVClient implementation which manages
+// connection lifecycle via WebSocketClient. On platforms where WebSocket functionality is stubbed
+// (e.g. FoundationNetworking environments), WebSocketClient still exists as a stub actor so this
+// unified type works cross-platform.
+
 /// Represents an active connection to a TV
 public actor ConnectionSession: Identifiable {
     /// Unique session identifier
     public let id: UUID
-    
+
     /// Connected device
     public let device: TVDevice
-    
+
     /// Current state (disconnected, connecting, connected, error)
     public private(set) var state: ConnectionState
-    
+
     /// Authentication token for reconnection
     public private(set) var authToken: String?
-    
-    #if canImport(FoundationNetworking)
-    /// Active WebSocket connection
-    public private(set) var websocket: Any?
-    #else
-    /// Active WebSocket connection
-    public private(set) var websocket: URLSessionWebSocketTask?
-    #endif
-    
+
+    /// Active WebSocket abstraction (nil when disconnected)
+    public private(set) var webSocketClient: WebSocketClient?
+
     /// Connection establishment time
     public private(set) var connectedAt: Date?
-    
+
     /// Last communication timestamp
     public private(set) var lastActivity: Date
-    
+
     /// Ping interval (default: 30s)
     public let healthCheckInterval: TimeInterval
-    
+
     /// Initialize a new connection session
     /// - Parameters:
     ///   - device: TV device to connect to
@@ -43,12 +44,12 @@ public actor ConnectionSession: Identifiable {
         self.device = device
         self.state = .disconnected
         self.authToken = nil
-        self.websocket = nil
+    self.webSocketClient = nil
         self.connectedAt = nil
         self.lastActivity = Date()
         self.healthCheckInterval = healthCheckInterval
     }
-    
+
     /// Update connection state
     /// - Parameter newState: New connection state
     public func updateState(_ newState: ConnectionState) {
@@ -57,35 +58,33 @@ public actor ConnectionSession: Identifiable {
             connectedAt = Date()
         }
     }
-    
+
     /// Set authentication token
     /// - Parameter token: Authentication token string
     public func setAuthToken(_ token: String) {
         authToken = token
     }
-    
-    #if canImport(FoundationNetworking)
-    /// Set WebSocket task
-    /// - Parameter task: WebSocket task instance
-    public func setWebSocket(_ task: Any) {
-        websocket = task
+
+    /// Associate an active WebSocketClient with this session
+    /// - Parameter client: Connected WebSocketClient instance
+    public func setWebSocket(_ client: WebSocketClient) {
+        webSocketClient = client
     }
-    #else
-    /// Set WebSocket task
-    /// - Parameter task: URLSessionWebSocketTask instance
-    public func setWebSocket(_ task: URLSessionWebSocketTask) {
-        websocket = task
-    }
-    #endif
-    
+
     /// Update last activity timestamp
     public func updateActivity() {
         lastActivity = Date()
     }
-    
+
     /// Clear WebSocket connection
     public func clearWebSocket() {
-        websocket = nil
+        webSocketClient = nil
         connectedAt = nil
+    }
+
+    /// Retrieve the active WebSocket client, if connected
+    /// - Returns: Active WebSocketClient or nil when disconnected
+    public func webSocket() -> WebSocketClient? {
+        webSocketClient
     }
 }

@@ -188,4 +188,7 @@ public enum KeyCode: String, Sendable, Codable {
     case num7 = "KEY_7"
     case num8 = "KEY_8"
     case num9 = "KEY_9"
+    
+    // Special
+    case factory = "KEY_FACTORY"
 }

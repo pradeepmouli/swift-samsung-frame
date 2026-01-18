@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- `ResponseParser` utility module for handling WebSocket responses with mixed JSON and binary content
+- `splitJSONAndTail()` function to parse Art Mode responses containing JSON followed by thumbnail data
+- `processAPIResponse()` function for unified handling of string, pure JSON, and JSON+binary responses
+- `KEY_FACTORY` key code to KeyCode enum for factory reset functionality
+
+### Changed
+- WebSocketClient Linux stub now matches full signature with `protocols` parameter
+
+### Fixed
+- Swift 6 strict concurrency compliance in ResponseParser using Data instead of [String: Any]
+- Removed duplicate `generateConnectionID()` from ResponseParser (already exists in D2DSocketClient)
+
 ## [0.2.0] - 2024-11-11
 
 ### Added

@@ -11,7 +11,7 @@ import OSLog
 public actor WebSocketClient {
     public init() {}
 
-    public func connect(to url: URL) async throws {
+    public func connect(to url: URL, protocols: [String] = []) async throws {
         throw TVError.connectionFailed(reason: "WebSocket not supported on this platform")
     }
 

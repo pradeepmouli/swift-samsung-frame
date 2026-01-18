@@ -7,12 +7,10 @@ import Foundation
 
 @Test("ResponseParser generates random connection IDs")
 func testGenerateConnectionID() async throws {
-    let id1 = ResponseParser.generateConnectionID()
-    let id2 = ResponseParser.generateConnectionID()
-    
-    // Verify IDs are valid UInt32 values
-    #expect(id1 >= 0)
-    #expect(id2 >= 0)
+    // Note: Connection ID generation is provided by D2DSocketClient.generateConnectionID()
+    // This test verifies the basic pattern works
+    let id1 = D2DSocketClient.generateConnectionID()
+    let id2 = D2DSocketClient.generateConnectionID()
     
     // Verify IDs are (very likely) different
     #expect(id1 != id2)

@@ -11,7 +11,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ResponseParser` utility module for handling WebSocket responses with mixed JSON and binary content
 - `splitJSONAndTail()` function to parse Art Mode responses containing JSON followed by thumbnail data
 - `processAPIResponse()` function for unified handling of string, pure JSON, and JSON+binary responses
-- `generateConnectionID()` function for D2D socket connection identification
 - `KEY_FACTORY` key code to KeyCode enum for factory reset functionality
 
 ### Changed
@@ -19,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Swift 6 strict concurrency compliance in ResponseParser using Data instead of [String: Any]
+- Removed duplicate `generateConnectionID()` from ResponseParser (already exists in D2DSocketClient)
 
 ## [0.2.0] - 2024-11-11
 

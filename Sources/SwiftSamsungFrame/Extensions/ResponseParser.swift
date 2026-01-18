@@ -123,14 +123,4 @@ public enum ResponseParser {
             throw ResponseParseError.invalidJSON
         }
     }
-    
-    /// Generate a random connection ID for D2D socket handshake
-    ///
-    /// Returns a random UInt32 value used for identifying the connection during
-    /// D2D (device-to-device) socket communications with Samsung TVs.
-    ///
-    /// - Returns: Random connection identifier (0 to UInt32.max)
-    public static func generateConnectionID() -> UInt32 {
-        return UInt32.random(in: 0...UInt32.max)
-    }
 }

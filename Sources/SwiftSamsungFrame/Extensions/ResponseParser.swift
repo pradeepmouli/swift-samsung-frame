@@ -1,5 +1,9 @@
 // ResponseParser - Utilities for parsing WebSocket responses
 // Handles JSON responses with optional binary data tail
+//
+// Ported from samsung-tv-ws-api (https://github.com/xchwarze/samsung-tv-ws-api)
+// Original implementation in Python by DSR! <xchwarze@gmail.com>
+// Swift implementation follows the same logic for compatibility
 
 import Foundation
 

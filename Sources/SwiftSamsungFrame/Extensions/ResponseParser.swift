@@ -49,7 +49,7 @@ public enum ResponseParser {
     /// - Throws: ResponseParseError if JSON structure cannot be found
     public static func splitJSONAndTail(_ data: Data) throws -> (jsonData: Data, tailData: Data) {
         // Find start of JSON object
-        guard let start = data.firstIndex(of: UInt8(ascii: "{")) else {
+        guard let start = data.firstIndex(of: 0x7B) else { // '{'
             throw ResponseParseError.jsonStartNotFound
         }
         
@@ -80,7 +80,7 @@ public enum ResponseParser {
         var tailData = data[end...]
         
         // Skip leading newline in tail if present
-        if tailData.first == UInt8(ascii: "\n") {
+        if tailData.first == 0x0A { // '\n'
             tailData = tailData.dropFirst()
         }
         

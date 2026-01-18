@@ -11,7 +11,6 @@ import Foundation
 public enum ResponseParseError: Error, Sendable {
     case jsonStartNotFound
     case jsonEndNotFound
-    case invalidUTF8
     case invalidJSON
 }
 
@@ -41,6 +40,10 @@ public enum ResponseParser {
     /// Some Samsung TV responses (particularly Art Mode responses) contain JSON followed
     /// by binary data. This function separates them by parsing the JSON structure.
     ///
+    /// **Note**: This implementation uses a simple brace-counting approach that assumes
+    /// well-formed JSON without escaped braces in string values. This matches the behavior
+    /// of the original Python implementation and works correctly for Samsung TV responses.
+    ///
     /// - Parameter data: Raw bytes from WebSocket message
     /// - Returns: Tuple of (JSON data, remaining binary data)
     /// - Throws: ResponseParseError if JSON structure cannot be found
@@ -51,6 +54,8 @@ public enum ResponseParser {
         }
         
         // Parse through JSON to find matching closing brace
+        // Note: This simple approach works for Samsung TV responses which don't use
+        // escaped braces in strings. For more complex JSON, consider using JSONSerialization.
         var depth = 0
         var end: Int?
         
@@ -121,13 +126,11 @@ public enum ResponseParser {
     
     /// Generate a random connection ID for D2D socket handshake
     ///
-    /// Returns a random integer in the range [0, 4GB) used for identifying
-    /// the connection during D2D (device-to-device) socket communications.
+    /// Returns a random UInt32 value used for identifying the connection during
+    /// D2D (device-to-device) socket communications with Samsung TVs.
     ///
-    /// - Returns: Random connection identifier
+    /// - Returns: Random connection identifier (0 to UInt32.max)
     public static func generateConnectionID() -> UInt32 {
-        // 4GB = 4 * 1024 * 1024 * 1024 = 4294967296, but UInt32.max = 4294967295
-        // So we use UInt32.max as the upper bound
         return UInt32.random(in: 0...UInt32.max)
     }
 }
